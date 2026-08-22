@@ -1,5 +1,45 @@
+```
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Demo results
+demo_results/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Dependencies
+venv/
+.venv/
 node_modules/
-.next/
+
+# Build artifacts
 dist/
 build/
-*.log
+target/
+
+# Editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+```.next/
