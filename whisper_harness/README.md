@@ -90,7 +90,7 @@ python cli.py --audio test.wav --model-type hf_whisper --model-id sberbank-ai/wh
 python cli.py --audio test.wav --config benchmark_config.yaml
 ```
 
-## 📊 Benchmark Harness (Новое!)
+## 📊 Benchmark Harness (Updated!)
 
 Запуск автоматизированного бенчмарка с несколькими конфигурациями:
 
@@ -110,43 +110,80 @@ python benchmark.py --generate-sample-config
 
 ### Формат YAML конфигурации
 
-Поддерживается два формата:
+Поддерживаются оба формата - **singular** и **plural**:
 
-**1. Shortcut формат (рекомендуется)** - просто укажите framework, model и quantizations:
+**1. Shortcut формат (рекомендуется)** - просто укажите framework, model/models и quantizations:
 
 ```yaml
 benchmarks:
-  # Faster-Whisper с несколькими квантизациями
+  # Faster-Whisper с несколькими моделями (plural form)
   - framework: faster-whisper
-    model: small
+    models: [medium, small]
     quantizations: [int8_float32, float16]
     devices: [cuda]
+    beam_sizes: [1, 3]
     
-  # Whisper.cpp с разными уровнями квантования
+  # Whisper.cpp - singular form тоже работает
   - framework: whisper.cpp
     model: ggerganov/whisper.cpp
-    quantizations: [q5_0, q4_0]
+    quantization: [q5_0, q4_0]
     devices: [cpu]
     
-  # HuggingFace Whisper (Russian fine-tuned)
+  # HuggingFace Whisper - квантизации авто-детектятся
   - framework: huggingface
-    model: openai/whisper-small-ru
+    models: 
+      - openai/whisper-small-ru
+      - sberbank-ai/whisper-medium-ru
     devices: [cuda]
 ```
 
-**2. Полный явный формат** - когда нужен полный контроль:
+**2. Полный явный формат с offloading** - для transcribe.cpp и подобных:
 
 ```yaml
 benchmarks:
-  - framework: faster-whisper
-    model: large-v3
-    quantizations: [int8_float32]
-    devices: [cuda]
-    beam_sizes: [1]
-    compute_type: int8_float32
-    language: ru
-    gpu_id: 0
+  - framework: transcribe.cpp
+    models: [handy-computer/gigaam-v3-e2e-rnnt-gguf]
+    quantizations: [Q6_K, Q8_0, Q5_K_M]
+    devices: [cuda, cpu, offload]
+    offload_configs:
+      - layer_count: 10  # offload first 10 layers to GPU
+        split_mode: "layer"
+      - layer_count: 0   # all on CPU
+        split_mode: "none"
+      - layer_count: 999 # all on GPU (if fits)
+        split_mode: "layer"
+    threads: 4
 ```
+
+**3. Test datasets с ground truth** - для автоматического WER/CER расчета:
+
+```yaml
+test_datasets:
+  - name: "russian_speech_sample"
+    audio_path: "/path/to/audio.wav"
+    reference_text: "/path/to/ground_truth.txt"
+    # Или inline текст:
+    # reference_text: "Привет мир это тестовая транскрипция"
+    language: "ru"
+    
+  - name: "english_podcast"
+    audio_path: "podcast_ep01.wav"
+    reference_text: "podcast_transcript.txt"
+    language: "en"
+```
+
+При наличии `test_datasets` бенчмарк запустится на каждом аудиофайле из списка.
+
+### Поддерживаемые фреймворки
+
+| Framework | Shortcut | Plural/Singular | Offload Support | Auto Quantizations |
+|-----------|----------|-----------------|-----------------|-------------------|
+| faster-whisper | ✅ | ✅ | ❌ | ✅ |
+| whisper.cpp | ✅ | ✅ | ⚠️ | ✅ |
+| huggingface | ✅ | ✅ | ❌ | ✅ |
+| sber | ✅ | ✅ | ❌ | ✅ |
+| onnx-asr | ✅ | ✅ | ✅ | ✅ |
+| transcribe.cpp | ✅ | ✅ | ✅ | ✅ |
 
 ## 📊 Интерпретация метрик
 
