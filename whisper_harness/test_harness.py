@@ -158,6 +158,244 @@ class TestConfigLoading(unittest.TestCase):
         self.assertEqual(config, {})
 
 
+class TestBenchmarkConfig(unittest.TestCase):
+    """Tests for benchmark.py configuration and parsing."""
+
+    def test_offload_config_default(self):
+        """OffloadConfig should have sensible defaults."""
+        from benchmark import OffloadConfig
+        config = OffloadConfig()
+        self.assertEqual(config.layer_count, 0)
+        self.assertEqual(config.split_mode, "none")
+        self.assertIsNone(config.block_count)
+        self.assertIsNone(config.max_vram_gb)
+
+    def test_offload_config_custom(self):
+        """OffloadConfig should accept custom values."""
+        from benchmark import OffloadConfig
+        config = OffloadConfig(
+            layer_count=10,
+            split_mode="layer",
+            block_count=5,
+            max_vram_gb=2.0
+        )
+        self.assertEqual(config.layer_count, 10)
+        self.assertEqual(config.split_mode, "layer")
+        self.assertEqual(config.block_count, 5)
+        self.assertEqual(config.max_vram_gb, 2.0)
+
+    def test_test_dataset_default(self):
+        """TestDataset should have sensible defaults."""
+        from benchmark import TestDataset
+        dataset = TestDataset()
+        self.assertEqual(dataset.name, "")
+        self.assertEqual(dataset.audio_path, "")
+        self.assertIsNone(dataset.reference_text)
+        self.assertEqual(dataset.language, "ru")
+        self.assertIsNone(dataset.languages)
+
+    def test_benchmark_config_default(self):
+        """BenchmarkConfig should have sensible defaults."""
+        from benchmark import BenchmarkConfig
+        config = BenchmarkConfig()
+        self.assertEqual(config.framework, "faster-whisper")
+        self.assertEqual(config.model, "small")
+        self.assertEqual(config.device, "cuda")
+        self.assertEqual(config.beam_size, 1)
+        self.assertIsNone(config.offload_config)
+
+    def test_normalize_to_list_none(self):
+        """normalize_to_list should handle None."""
+        from benchmark import normalize_to_list
+        result = normalize_to_list(None)
+        self.assertEqual(result, [])
+
+    def test_normalize_to_list_single_value(self):
+        """normalize_to_list should wrap single values in list."""
+        from benchmark import normalize_to_list
+        result = normalize_to_list("small")
+        self.assertEqual(result, ["small"])
+
+    def test_normalize_to_list_already_list(self):
+        """normalize_to_list should return list unchanged."""
+        from benchmark import normalize_to_list
+        input_list = ["small", "medium"]
+        result = normalize_to_list(input_list)
+        self.assertEqual(result, input_list)
+        self.assertIs(result, input_list)  # Returns same reference
+
+    def test_parse_offload_configs_empty(self):
+        """parse_offload_configs should return default config for empty input."""
+        from benchmark import parse_offload_configs
+        configs = parse_offload_configs(None)
+        self.assertEqual(len(configs), 1)
+        self.assertEqual(configs[0].split_mode, "none")
+
+    def test_parse_offload_configs_dict(self):
+        """parse_offload_configs should handle dict input."""
+        from benchmark import parse_offload_configs
+        data = {"layer_count": 10, "split_mode": "layer"}
+        configs = parse_offload_configs(data)
+        self.assertEqual(len(configs), 1)
+        self.assertEqual(configs[0].layer_count, 10)
+        self.assertEqual(configs[0].split_mode, "layer")
+
+    def test_parse_offload_configs_list_of_dicts(self):
+        """parse_offload_configs should handle list of dicts."""
+        from benchmark import parse_offload_configs
+        data = [
+            {"layer_count": 10, "split_mode": "layer"},
+            {"layer_count": 0, "split_mode": "none"}
+        ]
+        configs = parse_offload_configs(data)
+        self.assertEqual(len(configs), 2)
+        self.assertEqual(configs[0].layer_count, 10)
+        self.assertEqual(configs[1].layer_count, 0)
+
+    def test_parse_offload_configs_string(self):
+        """parse_offload_configs should handle string input."""
+        from benchmark import parse_offload_configs
+        data = "auto"
+        configs = parse_offload_configs(data)
+        self.assertEqual(len(configs), 1)
+        self.assertEqual(configs[0].split_mode, "auto")
+
+
+class TestYAMLConfigGeneration(unittest.TestCase):
+    """Tests for YAML config generation from parsed data."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        from benchmark import SystemConfig
+        self.system_config = SystemConfig(
+            cpu_model="Test CPU",
+            cpu_cores=4,
+            total_ram_gb=8.0,
+            gpu_name="Test GPU",
+            gpu_count=1,
+            total_vram_gb=2.0,
+        )
+
+    def test_generate_configs_shortcut_format(self):
+        """Should generate configs from shortcut YAML format."""
+        from benchmark import generate_test_configs
+        yaml_config = {
+            "benchmarks": [
+                {
+                    "framework": "faster-whisper",
+                    "models": ["small", "medium"],
+                    "quantizations": ["int8_float32"],
+                    "devices": ["cuda"],
+                }
+            ]
+        }
+        configs, datasets = generate_test_configs(yaml_config, self.system_config)
+        # Should generate 2 configs (small + medium)
+        self.assertEqual(len(configs), 2)
+        frameworks = [c.framework for c in configs]
+        self.assertTrue(all(f == "faster-whisper" for f in frameworks))
+
+    def test_generate_configs_singular_form(self):
+        """Should handle singular form (model instead of models)."""
+        from benchmark import generate_test_configs
+        yaml_config = {
+            "benchmarks": [
+                {
+                    "framework": "whisper.cpp",
+                    "model": "ggerganov/whisper.cpp",
+                    "quantization": ["q5_0"],
+                    "devices": ["cpu"],
+                }
+            ]
+        }
+        configs, datasets = generate_test_configs(yaml_config, self.system_config)
+        self.assertEqual(len(configs), 1)
+        self.assertEqual(configs[0].model, "ggerganov/whisper.cpp")
+
+    def test_generate_configs_auto_quantizations(self):
+        """Should auto-detect quantizations when not specified."""
+        from benchmark import generate_test_configs
+        yaml_config = {
+            "benchmarks": [
+                {
+                    "framework": "faster-whisper",
+                    "model": "small",
+                    # No quantizations specified
+                }
+            ]
+        }
+        configs, datasets = generate_test_configs(yaml_config, self.system_config)
+        self.assertEqual(len(configs), 1)
+        self.assertEqual(configs[0].quantization, "int8_float32")
+
+    def test_generate_configs_with_offload(self):
+        """Should handle offload configurations."""
+        from benchmark import generate_test_configs
+        yaml_config = {
+            "benchmarks": [
+                {
+                    "framework": "transcribe.cpp",
+                    "models": ["test-model"],
+                    "devices": ["offload"],
+                    "offload_configs": [
+                        {"layer_count": 10, "split_mode": "layer"},
+                        {"layer_count": 0, "split_mode": "none"}
+                    ]
+                }
+            ]
+        }
+        configs, datasets = generate_test_configs(yaml_config, self.system_config)
+        # Should generate 2 configs (one per offload_config)
+        self.assertEqual(len(configs), 2)
+        self.assertIsNotNone(configs[0].offload_config)
+        self.assertEqual(configs[0].offload_config.layer_count, 10)
+
+    def test_generate_configs_test_datasets(self):
+        """Should parse test datasets from YAML."""
+        from benchmark import generate_test_configs
+        yaml_config = {
+            "test_datasets": [
+                {
+                    "name": "test_dataset",
+                    "audio_path": "/path/to/audio.wav",
+                    "reference_text": "/path/to/ground_truth.txt",
+                    "language": "ru"
+                }
+            ],
+            "benchmarks": [
+                {
+                    "framework": "faster-whisper",
+                    "model": "small"
+                }
+            ]
+        }
+        configs, datasets = generate_test_configs(yaml_config, self.system_config)
+        self.assertEqual(len(datasets), 1)
+        self.assertEqual(datasets[0].name, "test_dataset")
+        self.assertEqual(datasets[0].audio_path, "/path/to/audio.wav")
+
+    def test_generate_configs_skip_cuda_no_gpu(self):
+        """Should skip CUDA configs when no GPU available."""
+        from benchmark import generate_test_configs, SystemConfig
+        system_config = SystemConfig(
+            gpu_count=0,  # No GPU
+        )
+        yaml_config = {
+            "benchmarks": [
+                {
+                    "framework": "faster-whisper",
+                    "model": "small",
+                    "devices": ["cuda", "cpu"],
+                }
+            ]
+        }
+        configs, datasets = generate_test_configs(yaml_config, system_config)
+        # Should only have CPU config
+        devices = [c.device for c in configs]
+        self.assertNotIn("cuda", devices)
+        self.assertIn("cpu", devices)
+
+
 def create_test_audio(duration_sec: float = 1.0, sample_rate: int = 16000) -> str:
     """Create a temporary WAV file for testing."""
     import numpy as np
