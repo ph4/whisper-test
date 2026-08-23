@@ -117,7 +117,8 @@ class SberGigaAMTranscriber(Transcriber):
 
             if self.device == "cuda":
                 self._model.to("cuda")
-                torch.cuda.empty_cache()
+                from utils.memory_monitor import clear_gpu_cache
+                clear_gpu_cache()
 
         except ImportError:
             raise RuntimeError("transformers not installed. Run: pip install transformers")

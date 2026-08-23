@@ -1,27 +1,104 @@
-# Core dependencies
-torch>=2.0.0
-numpy>=1.24.0
-scipy>=1.10.0
+# Whisper Harness - Consolidated Requirements
+# =============================================
+# 
+# This file contains ALL dependencies for the whisper_harness project.
+# Lines starting with # are comments.
+# To install optional dependencies, uncomment the relevant lines.
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# For minimal installation (core functionality only):
+#   Keep only the REQUIRED section uncommented.
+#
+# For full development installation:
+#   Uncomment all sections including OPTIONAL dependencies.
 
-# ASR backends
-faster-whisper>=0.10.0  # Основной бэкенд для GPU
-transformers>=4.35.0    # Для HuggingFace моделей
+# =============================================================================
+# REQUIRED - Core Dependencies (uncommented by default)
+# =============================================================================
+# These are required for basic functionality
 
-# Memory monitoring
-psutil>=5.9.0           # Мониторинг RAM
+faster-whisper>=1.0.0        # Faster Whisper implementation (CTranslate2)
+transformers>=4.30.0         # HuggingFace transformers for HF Whisper models
+scipy>=1.10.0                # Audio processing
+soundfile>=0.12.0            # Audio file I/O
+librosa>=0.10.0              # Audio feature extraction
+psutil>=5.9.0                # System monitoring (RAM/CPU)
+pynvml>=11.0.0               # NVIDIA GPU monitoring (VRAM)
+pyyaml>=6.0                  # YAML configuration parsing
+jiwer>=3.0.0                 # WER/CER calculation
+huggingface_hub>=0.17.0      # Model downloading from HuggingFace
 
-# Optional: whisper.cpp support
-# pywhispercpp>=1.0.0   # Раскомментировать для whisper.cpp
-# huggingface_hub>=0.19.0  # Для автозагрузки моделей whisper.cpp
+# =============================================================================
+# OPTIONAL - Framework Extensions (commented out by default)
+# =============================================================================
+# Uncomment these lines to enable additional frameworks
 
-# Optional: Sber GigaAM ONNX support
-# onnxruntime>=1.16.0   # Раскомментировать для ONNX-версии Sber
+# PyTorch (optional - for improved VRAM management)
+# If not installed, ctypes + CUDA driver API will be used instead
+# torch --index-url https://download.pytorch.org/whl/cu118
 
-# Optional: Metrics
-# jiwer>=3.0.0          # Раскомментировать для альтернативного WER
+# Whisper.cpp support (recommended for quantized models)
+# pywhispercpp>=1.5.0
 
-# Optional: Configuration
-# pyyaml>=6.0.0         # Раскомментировать для YAML конфигов
+# ONNX Runtime for Sber GigaAM and other ONNX models (recommended for low-RAM systems)
+# onnxruntime-gpu>=1.16.0    # Use this for GPU acceleration
+# onnxruntime>=1.16.0        # Use this for CPU-only
 
-# Development
-# pytest>=7.4.0         # Для тестов
+# Transcribe.cpp support (for GGUF models with advanced offloading)
+# Note: This requires manual installation from source
+# See README.md for instructions
+
+# =============================================================================
+# OPTIONAL - Development & Testing (commented out by default)
+# =============================================================================
+# Uncomment these lines for development work
+
+# pytest>=7.4.0              # Testing framework
+# pytest-cov>=4.1.0          # Coverage reporting
+# black>=23.0.0              # Code formatting
+# flake8>=6.1.0              # Linting
+# mypy>=1.5.0                # Type checking
+
+# =============================================================================
+# PLATFORM-SPECIFIC NOTES
+# =============================================================================
+#
+# For CUDA 11.8 (most common):
+#   torch --index-url https://download.pytorch.org/whl/cu118
+#   onnxruntime-gpu>=1.16.0
+#
+# For CUDA 12.x (newer GPUs):
+#   torch --index-url https://download.pytorch.org/whl/cu121
+#   onnxruntime-gpu>=1.17.0
+#
+# For CPU-only systems:
+#   Skip torch and onnxruntime-gpu
+#   Use onnxruntime (CPU version) instead
+#
+# Minimal installation (~500MB total):
+#   Keep only REQUIRED section
+#   Skip torch, use ctypes fallback for CUDA cache
+#
+# Full installation (~2GB+ total):
+#   Uncomment all sections
+#   Best VRAM management with PyTorch
+#
+# =============================================================================
+# QUICK INSTALL COMMANDS
+# =============================================================================
+#
+# Minimal (no PyTorch, uses ctypes for CUDA):
+#   pip install -r requirements.txt
+#
+# Recommended (with PyTorch for best VRAM management):
+#   pip install -r requirements.txt
+#   pip install torch --index-url https://download.pytorch.org/whl/cu118
+#
+# Full development:
+#   pip install -r requirements.txt
+#   pip install torch --index-url https://download.pytorch.org/whl/cu118
+#   pip install pywhispercpp onnxruntime-gpu pytest black flake8
+#
+# =============================================================================

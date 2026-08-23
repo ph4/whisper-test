@@ -1,38 +1,48 @@
 # YAML Configuration Design for Whisper Harness
 # ==============================================
 # 
-# IMPLEMENTATION STATUS: ✅ COMPLETE
+# IMPLEMENTATION STATUS: ✅ COMPLETE & TESTED
 # All features from this design have been implemented in benchmark.py
-# Tests available in test_harness.py (TestBenchmarkConfig, TestYAMLConfigGeneration)
+# Tests available in test_harness.py (run with: python -m unittest test_harness.py -v)
 
-## Final YAML Syntax Design
+## Overview
 
-The configuration supports:
-1. **Singular and plural forms** (model/models, quantization/quantizations, device/devices)
-2. **Shortcut format** for common frameworks (faster-whisper, whisper.cpp)
-3. **Full explicit format** for fine-grained control
-4. **Offload configurations** for transcribe.cpp and similar frameworks
-5. **Test audio files and ground truth references** in the config
-6. **WER/CER evaluation data** embedded or referenced
+This document describes the YAML configuration system for the Whisper Harness benchmarking tool.
+The system supports flexible configuration formats, multiple frameworks, and comprehensive testing options.
+
+## Key Features
+
+1. **Singular/Plural Flexibility**: Both `model: small` and `models: [small, medium]` work seamlessly
+2. **Shortcut Format**: Simple configs for common frameworks (faster-whisper, whisper.cpp)
+3. **Full Explicit Format**: Complete control with offload configurations
+4. **Test Dataset Integration**: Audio files with ground truth for WER/CER calculation
+5. **Framework Auto-Detection**: Quantizations automatically detected when not specified
+6. **GPU Offloading Support**: Advanced layer-based offloading for transcribe.cpp
 
 ---
 
-## Example YAML Structure
+## Complete YAML Syntax Reference
+
+### Global Settings (Optional)
 
 ```yaml
-# Global settings (optional)
 settings:
   output_dir: "benchmark_results"
-  mode: "quick"  # quick, full, compare
+  mode: "quick"  # Options: quick, full, compare
   default_language: "ru"
   default_threads: 2
-  
-# Test datasets - audio files with optional ground truth
+```
+
+### Test Datasets
+
+Define audio files with optional ground truth references:
+
+```yaml
 test_datasets:
   - name: "russian_speech_sample"
     audio_path: "/path/to/audio.wav"
     reference_text: "/path/to/ground_truth.txt"
-    # Or inline reference:
+    # Or inline reference text:
     # reference_text: "Привет мир это тестовая транскрипция"
     language: "ru"
     
@@ -43,60 +53,92 @@ test_datasets:
     
   - name: "multilingual_mix"
     audio_path: "mixed_audio.wav"
-    # No reference = no WER/CER calculation
+    # No reference = only timing metrics (no WER/CER)
     languages: ["ru", "en"]
+```
 
-# Benchmark configurations
+### Benchmark Configurations
+
+#### 1. Shortcut Format - faster-whisper (plural form)
+
+```yaml
 benchmarks:
-  # SHORTCUT FORMAT - faster-whisper with multiple models
   - framework: faster-whisper
-    models: [medium, small]  # plural form
+    models: [medium, small]  # plural: tests both models
     quantizations: [int8_float32, float16]
     devices: [cuda]
     beam_sizes: [1, 3]
-    
-  # SHORTCUT FORMAT - singular form also works
+```
+
+#### 2. Shortcut Format - whisper.cpp (singular form)
+
+```yaml
   - framework: whisper.cpp
     model: ggerganov/whisper.cpp  # singular form
-    quantization: [q5_0, q4_0]   # can still be list
+    quantization: [q5_0, q4_0]   # can still be a list
     devices: [cpu]
     threads: 2
-    
-  # HuggingFace models - auto-detect quantizations
+```
+
+#### 3. HuggingFace Models - Auto-detect Quantizations
+
+```yaml
   - framework: huggingface
     models: 
       - openai/whisper-small-ru
       - sberbank-ai/whisper-medium-ru
     devices: [cuda]
     load_in_8bit: false
-    
-  # Sber GigaAM with ONNX
+    # torch_dtype auto-detected from model
+```
+
+#### 4. Sber GigaAM with ONNX (Recommended for Low-RAM Systems)
+
+```yaml
   - framework: sber
-    models: [ctc, rnnt]  # model types
+    models: [ctc, rnnt]  # model types: ctc or rnnt
     use_onnx: true
     devices: [cpu, cuda]
-    
-  # FULL EXPLICIT FORMAT - transcribe.cpp with offloading
-  - framework: transcribe.cpp
-    models: [handy-computer/gigaam-v3-e2e-rnnt-gguf]
-    quantizations: [Q6_K, Q8_0, Q5_K_M]
-    devices: [cuda, cpu, offload]
-    offload_configs:
-      - layer_count: 10  # offload first 10 layers to GPU
-        split_mode: "layer"
-      - layer_count: 0   # all on CPU
-        split_mode: "none"
-      - layer_count: 999 # all on GPU (if fits)
-        split_mode: "layer"
-    threads: 4
-    
-  # ONNX ASR models
+```
+
+#### 5. ONNX ASR Models (GigaAM v3 via onnx-asr)
+
+```yaml
   - framework: onnx-asr
     models: [gigaam-v3-e2e-ctc, gigaam-v3-e2e-rnnt]
     devices: [cuda, cpu]
     execution_providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    
-  # Explicit per-config override
+```
+
+#### 6. Full Explicit Format - transcribe.cpp with GPU Offloading
+
+Ideal for GGUF models like GigaAM v3:
+
+```yaml
+  - framework: transcribe.cpp
+    models: [handy-computer/gigaam-v3-e2e-rnnt-gguf]
+    quantizations: [Q6_K, Q8_0, Q5_K_M]
+    devices: [cuda, cpu, offload]
+    threads: 4
+    # Offload configurations - tests different GPU/CPU splits
+    offload_configs:
+      # Option 1: Split by layers - first 10 layers on GPU
+      - layer_count: 10
+        split_mode: "layer"
+      # Option 2: All on CPU (no offloading)
+      - layer_count: 0
+        split_mode: "none"
+      # Option 3: All on GPU (if VRAM allows)
+      - layer_count: 999
+        split_mode: "layer"
+      # Option 4: Dynamic based on available VRAM
+      - split_mode: "auto"
+        max_vram_gb: 2.0
+```
+
+#### 7. Explicit Per-Config Override - Full Control
+
+```yaml
   - framework: faster-whisper
     model: large-v3
     quantizations: [float16]
@@ -105,30 +147,33 @@ benchmarks:
     language: "ru"
     compute_type: "float16"
     gpu_id: 0
+    threads: 4
+```
+
+#### 8. Mixed Device Testing - One Model on CPU and GPU
+
+```yaml
+  - framework: faster-whisper
+    model: small
+    quantizations: [int8_float32]
+    devices: [cuda, cpu]  # Tests both devices
+    beam_sizes: [1]
+```
+
+#### 9. Minimal Config - All Defaults
+
+```yaml
+  - framework: faster-whisper
+    # model defaults to "small"
+    # quantizations auto-detected as [int8_float32]
+    # devices auto-detected as [cuda] or [cpu] based on system
 ```
 
 ---
 
-## Implementation Details
+## Offload Configuration Options
 
-### Data Classes (benchmark.py)
-
-- `OffloadConfig`: layer_count, split_mode, block_count, max_vram_gb
-- `TestDataset`: name, audio_path, reference_text, language, languages
-- `BenchmarkConfig`: framework, model, quantization, device, beam_size, offload_config, etc.
-- `BenchmarkResult`: timing metrics, memory metrics, WER/CER, transcription
-- `SystemConfig`: CPU/GPU info, RAM/VRAM totals
-
-### Key Functions
-
-- `parse_yaml_config(config_path)`: Load YAML file
-- `normalize_to_list(value)`: Handle singular/plural forms
-- `parse_offload_configs(offload_data)`: Parse offload configurations
-- `generate_test_configs(yaml_config, system_config, mode)`: Generate all benchmark configs
-
-### Offload Configuration Options
-
-For frameworks that support GPU offloading (transcribe.cpp, llama.cpp-based):
+For frameworks supporting GPU offloading (transcribe.cpp, llama.cpp-based):
 
 ```yaml
 offload_configs:
@@ -166,47 +211,117 @@ offload_configs:
 
 ---
 
-## Key Features
+## Key Features Explained
 
-1. **Flexible Input**: Both `model: small` and `models: [small, medium]` work
-2. **Smart Defaults**: If quantizations not specified, auto-detect based on framework
-3. **Test Datasets**: Define multiple audio files with ground truth once, reuse across benchmarks
-4. **Offload Control**: Fine-grained GPU offloading for memory-constrained systems
-5. **Framework Agnostic**: Same YAML structure works across all supported frameworks
+### 1. Flexible Input Forms
+
+Both singular and plural forms are supported:
+- `model: small` ≡ `models: [small]`
+- `quantization: [q5_0]` ≡ `quantizations: [q5_0]`
+- `device: cuda` ≡ `devices: [cuda]`
+
+### 2. Smart Defaults
+
+If quantizations are not specified, they are auto-detected based on the framework:
+- **faster-whisper**: `[int8_float32]`
+- **whisper.cpp**: `[q5_0]`
+- **huggingface**: Auto-detected from model config
+- **sber**: `[float32]` or `[int8]` if ONNX
+- **onnx-asr**: Framework defaults
+- **transcribe.cpp**: `[Q5_K_M]`
+
+### 3. Test Datasets
+
+Define multiple audio files with ground truth once, reuse across all benchmarks:
+- Audio paths can be absolute or relative
+- Reference text can be a file path or inline string
+- Multiple datasets can be defined in a single config
+- WER/CER only calculated when reference text is provided
+
+### 4. Offload Control
+
+Fine-grained GPU offloading for memory-constrained systems:
+- Layer-based splitting for precise control
+- Dynamic VRAM-based allocation
+- CPU-only fallback options
+- Automatic detection of optimal settings
+
+### 5. Framework Agnostic
+
+Same YAML structure works across all supported frameworks:
+- Consistent field names
+- Unified configuration format
+- Easy to switch between frameworks
+- Mix multiple frameworks in one config
 
 ---
 
 ## Usage Examples
 
+### Quick Benchmark with Default Config
+
 ```bash
-# Quick benchmark with default config
 python benchmark.py --audio test.wav --mode quick
+```
 
-# Full benchmark with YAML config
+### Full Benchmark with YAML Config
+
+```bash
 python benchmark.py --audio test.wav --config benchmark_config.yaml --mode full
+```
 
-# With ground truth for accuracy metrics
+### With Ground Truth for Accuracy Metrics
+
+```bash
 python benchmark.py --audio test.wav --reference ground_truth.txt
+```
 
-# Generate sample config
+### Generate Sample Config
+
+```bash
 python benchmark.py --generate-sample-config
 ```
 
----
+### Run Tests
 
-## Testing
-
-Run tests with:
 ```bash
-python -m unittest test_harness.TestBenchmarkConfig -v
-python -m unittest test_harness.TestYAMLConfigGeneration -v
+python -m unittest test_harness.py -v
 ```
 
 Tests cover:
-- OffloadConfig parsing
-- TestDataset parsing
+- OffloadConfig parsing and defaults
+- TestDataset configuration
 - BenchmarkConfig generation
-- Singular/plural form handling
+- Singular/plural form handling (normalize_to_list)
+- parse_offload_configs with various input types
+- YAML config generation from shortcut and explicit formats
 - Auto-quantization detection
-- Offload configuration combinations
 - GPU availability checks
+
+---
+
+## Complete Example Configuration
+
+See `sample_benchmark_config.yaml` for a complete working example that includes:
+- All framework types
+- Multiple test datasets
+- Various offload configurations
+- Both singular and plural forms
+- Inline and file-based references
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Model not found**: Ensure model ID is correct and internet connection is available
+2. **OOM errors**: Reduce beam_size, use int8 quantization, or switch to CPU
+3. **Slow performance**: Use smaller models, reduce beam_size, enable GPU
+4. **WER not calculated**: Ensure reference_text is provided in test_datasets
+
+### Getting Help
+
+- Check README.md for installation instructions
+- Review CUDA_CACHE_FREE.md for VRAM management options
+- Run tests to verify your setup: `python -m unittest test_harness.py -v`

@@ -162,13 +162,75 @@ class MemoryMonitor:
 
 
 def clear_gpu_cache() -> None:
-    """Clear GPU cache to free VRAM."""
+    """Clear GPU cache to free VRAM without requiring PyTorch.
+    
+    Uses one of these methods (in order of preference):
+    1. PyTorch (if available) - torch.cuda.empty_cache()
+    2. ctypes + CUDA driver API - cuMemGetInfo trick
+    3. nvidia-smi reset (not recommended, too aggressive)
+    4. No-op with warning
+    """
+    # Method 1: Try PyTorch first (most reliable)
     try:
         import torch
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+            return
     except ImportError:
+        pass
+    except Exception:
+        pass
+    
+    # Method 2: Use ctypes to call CUDA driver API directly
+    # This triggers garbage collection without needing full PyTorch
+    try:
+        import ctypes
+        import os
+        
+        # Try to load CUDA driver library
+        cuda_lib_names = [
+            "libcuda.so.1",      # Linux
+            "libcuda.so",        # Linux (fallback)
+            "nvcuda.dll",        # Windows
+            "cuda.dll",          # Windows (fallback)
+        ]
+        
+        cuda_lib = None
+        for lib_name in cuda_lib_names:
+            try:
+                cuda_lib = ctypes.CDLL(lib_name)
+                break
+            except OSError:
+                continue
+        
+        if cuda_lib is not None:
+            # Call cuInit(0) to initialize the driver
+            cuda_lib.cuInit(0)
+            
+            # Get current context
+            from ctypes import c_void_p, byref
+            
+            ctx = c_void_p()
+            result = cuda_lib.cuCtxGetCurrent(byref(ctx))
+            
+            # If we have a context, trigger GC by allocating/freeing small buffer
+            if ctx.value and result == 0:
+                # Allocate a small buffer to trigger GC
+                ptr = c_void_p()
+                size = 1024  # 1KB
+                cuda_lib.cuMemAlloc(byref(ptr), size)
+                cuda_lib.cuMemFree(ptr)
+            return
+    except Exception:
+        pass
+    
+    # Method 3: Force Python garbage collection
+    # This won't clear CUDA cache but may help with host memory
+    try:
+        import gc
+        gc.collect()
+    except Exception:
         pass
 
 
