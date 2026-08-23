@@ -108,54 +108,21 @@ python benchmark.py --audio test.wav --reference ground_truth.txt
 python benchmark.py --generate-sample-config
 ```
 
-### Формат YAML конфигурации
+### 📝 Полная спецификация YAML конфигурации
 
-Поддерживаются оба формата - **singular** и **plural**:
+Конфигурация поддерживает все возможные опции из DESIGN документа:
 
-**1. Shortcut формат (рекомендуется)** - просто укажите framework, model/models и quantizations:
-
-```yaml
-benchmarks:
-  # Faster-Whisper с несколькими моделями (plural form)
-  - framework: faster-whisper
-    models: [medium, small]
-    quantizations: [int8_float32, float16]
-    devices: [cuda]
-    beam_sizes: [1, 3]
-    
-  # Whisper.cpp - singular form тоже работает
-  - framework: whisper.cpp
-    model: ggerganov/whisper.cpp
-    quantization: [q5_0, q4_0]
-    devices: [cpu]
-    
-  # HuggingFace Whisper - квантизации авто-детектятся
-  - framework: huggingface
-    models: 
-      - openai/whisper-small-ru
-      - sberbank-ai/whisper-medium-ru
-    devices: [cuda]
-```
-
-**2. Полный явный формат с offloading** - для transcribe.cpp и подобных:
+#### Глобальные настройки (опционально)
 
 ```yaml
-benchmarks:
-  - framework: transcribe.cpp
-    models: [handy-computer/gigaam-v3-e2e-rnnt-gguf]
-    quantizations: [Q6_K, Q8_0, Q5_K_M]
-    devices: [cuda, cpu, offload]
-    offload_configs:
-      - layer_count: 10  # offload first 10 layers to GPU
-        split_mode: "layer"
-      - layer_count: 0   # all on CPU
-        split_mode: "none"
-      - layer_count: 999 # all on GPU (if fits)
-        split_mode: "layer"
-    threads: 4
+settings:
+  output_dir: "benchmark_results"
+  mode: "quick"  # quick, full, compare
+  default_language: "ru"
+  default_threads: 2
 ```
 
-**3. Test datasets с ground truth** - для автоматического WER/CER расчета:
+#### Test Datasets с ground truth
 
 ```yaml
 test_datasets:
@@ -170,20 +137,168 @@ test_datasets:
     audio_path: "podcast_ep01.wav"
     reference_text: "podcast_transcript.txt"
     language: "en"
+    
+  - name: "multilingual_mix"
+    audio_path: "mixed_audio.wav"
+    # Без reference = только timing метрики (без WER/CER)
+    languages: ["ru", "en"]
 ```
 
-При наличии `test_datasets` бенчмарк запустится на каждом аудиофайле из списка.
+#### Benchmark Configurations
 
-### Поддерживаемые фреймворки
+**1. SHORTCUT формат - faster-whisper (plural form)**
+
+```yaml
+benchmarks:
+  - framework: faster-whisper
+    models: [medium, small]  # plural: тестирует обе модели
+    quantizations: [int8_float32, float16]
+    devices: [cuda]
+    beam_sizes: [1, 3]
+```
+
+**2. SHORTCUT формат - whisper.cpp (singular form)**
+
+```yaml
+  - framework: whisper.cpp
+    model: ggerganov/whisper.cpp  # singular form
+    quantization: [q5_0, q4_0]   # может быть списком
+    devices: [cpu]
+    threads: 2
+```
+
+**3. HuggingFace модели - авто-детект квантизаций**
+
+```yaml
+  - framework: huggingface
+    models: 
+      - openai/whisper-small-ru
+      - sberbank-ai/whisper-medium-ru
+    devices: [cuda]
+    load_in_8bit: false
+    # torch_dtype авто-детектится из модели
+```
+
+**4. Sber GigaAM с ONNX (рекомендуется для систем с малым RAM)**
+
+```yaml
+  - framework: sber
+    models: [ctc, rnnt]  # типы моделей: ctc или rnnt
+    use_onnx: true
+    devices: [cpu, cuda]
+```
+
+**5. ONNX ASR модели (GigaAM v3 через onnx-asr)**
+
+```yaml
+  - framework: onnx-asr
+    models: [gigaam-v3-e2e-ctc, gigaam-v3-e2e-rnnt]
+    devices: [cuda, cpu]
+    execution_providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+```
+
+**6. FULL EXPLICIT формат - transcribe.cpp с GPU offloading**
+
+Идеально для GGUF моделей типа GigaAM v3:
+
+```yaml
+  - framework: transcribe.cpp
+    models: [handy-computer/gigaam-v3-e2e-rnnt-gguf]
+    quantizations: [Q6_K, Q8_0, Q5_K_M]
+    devices: [cuda, cpu, offload]
+    threads: 4
+    # Конфигурации offload - тестирует разные GPU/CPU split
+    offload_configs:
+      # Опция 1: Split по слоям - первые 10 слоев на GPU
+      - layer_count: 10
+        split_mode: "layer"
+      # Опция 2: Все на CPU (без offloading)
+      - layer_count: 0
+        split_mode: "none"
+      # Опция 3: Все на GPU (если VRAM позволяет)
+      - layer_count: 999
+        split_mode: "layer"
+      # Опция 4: Динамически на основе доступного VRAM
+      - split_mode: "auto"
+        max_vram_gb: 2.0
+```
+
+**7. Explicit per-config override - полный контроль**
+
+```yaml
+  - framework: faster-whisper
+    model: large-v3
+    quantizations: [float16]
+    devices: [cuda]
+    beam_sizes: [5]
+    language: "ru"
+    compute_type: "float16"
+    gpu_id: 0
+    threads: 4
+```
+
+**8. Mixed device testing - одна модель на CPU и GPU**
+
+```yaml
+  - framework: faster-whisper
+    model: small
+    quantizations: [int8_float32]
+    devices: [cuda, cpu]  # Тестирует оба устройства
+    beam_sizes: [1]
+```
+
+**9. Minimal config - все значения по умолчанию**
+
+```yaml
+  - framework: faster-whisper
+    # model defaults to "small"
+    # quantizations auto-detected as [int8_float32]
+    # devices auto-detected как [cuda] или [cpu] в зависимости от системы
+```
+
+### 🧩 Offload Configuration Options
+
+Для фреймворков с поддержкой GPU offloading (transcribe.cpp, llama.cpp-based):
+
+```yaml
+offload_configs:
+  # Option 1: Split по слоям
+  - layer_count: <int>      # Количество слоев для GPU
+    split_mode: "layer"     # Послойный split
+    
+  # Option 2: Split по rows/blocks  
+  - block_count: <int>
+    split_mode: "row"
+    
+  # Option 3: Без offloading (только CPU)
+  - split_mode: "none"
+  
+  # Option 4: Полный GPU (если память позволяет)
+  - split_mode: "full_gpu"
+  
+  # Option 5: Динамически на основе доступного VRAM
+  - split_mode: "auto"
+    max_vram_gb: 2.0        # Не превышать этот лимит VRAM
+```
+
+### 📋 Поддерживаемые фреймворки
 
 | Framework | Shortcut | Plural/Singular | Offload Support | Auto Quantizations |
 |-----------|----------|-----------------|-----------------|-------------------|
 | faster-whisper | ✅ | ✅ | ❌ | ✅ |
-| whisper.cpp | ✅ | ✅ | ⚠️ | ✅ |
-| huggingface | ✅ | ✅ | ❌ | ✅ |
+| whisper.cpp | ✅ | ✅ | ⚠️ (via main.cpp params) | ✅ |
+| huggingface | ✅ | ✅ | ❌ (uses device_map) | ✅ |
 | sber | ✅ | ✅ | ❌ | ✅ |
-| onnx-asr | ✅ | ✅ | ✅ | ✅ |
-| transcribe.cpp | ✅ | ✅ | ✅ | ✅ |
+| onnx-asr | ✅ | ✅ | ✅ (execution providers) | ✅ |
+| transcribe.cpp | ✅ | ✅ | ✅ (layer offloading) | ✅ |
+
+### 🔑 Ключевые особенности
+
+1. **Гибкий ввод**: Оба формата `model: small` и `models: [small, medium]` работают
+2. **Умные дефолты**: Если quantizations не указаны, авто-детект на основе фреймворка
+3. **Test Datasets**: Определите несколько аудиофайлов с ground truth один раз, используйте во всех бенчмарках
+4. **Offload Control**: Детальный контроль GPU offloading для систем с ограниченной памятью
+5. **Framework Agnostic**: Одна структура YAML работает со всеми поддерживаемыми фреймворками
 
 ## 📊 Интерпретация метрик
 

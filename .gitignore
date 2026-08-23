@@ -4,33 +4,36 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.py~
-*.py.class
 .Python
-env/
 venv/
 .venv/
-.ENV
-.venv.bak/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
+.env
+.env.local
+.env.*
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Testing
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
+coverage/
+.htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Logs
 *.log
-.git/modules/
-*.sconsign.dblite
-.sconsign
-*.pdb
-*.prof
-.settings/
-.dir-locals.el
-.hg/
-.svn/
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
 ```
