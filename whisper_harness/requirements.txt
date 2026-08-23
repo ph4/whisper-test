@@ -1,0 +1,27 @@
+# Core dependencies
+torch>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# ASR backends
+faster-whisper>=0.10.0  # Основной бэкенд для GPU
+transformers>=4.35.0    # Для HuggingFace моделей
+
+# Memory monitoring
+psutil>=5.9.0           # Мониторинг RAM
+
+# Optional: whisper.cpp support
+# pywhispercpp>=1.0.0   # Раскомментировать для whisper.cpp
+# huggingface_hub>=0.19.0  # Для автозагрузки моделей whisper.cpp
+
+# Optional: Sber GigaAM ONNX support
+# onnxruntime>=1.16.0   # Раскомментировать для ONNX-версии Sber
+
+# Optional: Metrics
+# jiwer>=3.0.0          # Раскомментировать для альтернативного WER
+
+# Optional: Configuration
+# pyyaml>=6.0.0         # Раскомментировать для YAML конфигов
+
+# Development
+# pytest>=7.4.0         # Для тестов

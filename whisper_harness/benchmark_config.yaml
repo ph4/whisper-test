@@ -1,0 +1,45 @@
+# Конфигурация бенчмарка Whisper ASR
+# Для использования: python cli.py --audio test.wav --config benchmark_config.yaml
+
+# Выбор модели и бэкенда
+model_type: fast_whisper  # fast_whisper, whisper_cpp, sber_gigaam_ctc, hf_whisper
+model_id: small           # tiny, base, small, medium, large-v3
+device: cuda              # cpu или cuda
+language: ru
+
+# Параметры faster-whisper
+compute_type: int8_float32  # int8_float16, int8_float32, float16, float32
+beam_size: 1                # 1, 3, 5 (больше = точнее но медленнее)
+
+# Параметры whisper.cpp
+quantization: q5_0          # q4_0, q5_0, q8_0, f16, f32
+threads: 2                  # Количество CPU потоков (2 для A4-5300)
+
+# Параметры Sber GigaAM
+use_onnx: true              # Использовать ONNX для экономии RAM
+
+# Параметры HuggingFace
+torch_dtype: float16        # float16, float32, bfloat16
+load_in_8bit: false         # 8-битная квантизация (требует bitsandbytes)
+
+# Мониторинг памяти
+memory_monitor:
+  sampling_interval_ms: 100  # Интервал замеров памяти
+
+# Вывод результатов
+output:
+  json: null                 # Путь к JSON файлу или null
+  csv: null                  # Путь к CSV файлу или null
+  markdown: null             # Путь к MD отчету или null
+
+# Тестовое аудио
+audio:
+  path: test.wav             # Путь к аудиофайлу
+  sample_rate: 16000         # Частота дискретизации
+  channels: 1                # Mono = 1, Stereo = 2
+
+# Референс для расчета WER/CER
+reference:
+  enabled: false             # Включить расчет метрик точности
+  path: ground_truth.txt     # Путь к файлу с эталонной транскрипцией
+  generate: false            # Сгенерировать плейсхолдер (для демо)
