@@ -90,29 +90,62 @@ python cli.py --audio test.wav --model-type hf_whisper --model-id sberbank-ai/wh
 python cli.py --audio test.wav --config benchmark_config.yaml
 ```
 
-## 🔧 Конфигурация через YAML
+## 📊 Benchmark Harness (Новое!)
 
-Создайте файл `benchmark_config.yaml`:
+Запуск автоматизированного бенчмарка с несколькими конфигурациями:
+
+```bash
+# Быстрый бенчмарк с конфиг по умолчанию
+python benchmark.py --audio test.wav --mode quick
+
+# Полный бенчмарк с YAML конфигом
+python benchmark.py --audio test.wav --config benchmark_config.yaml --mode full
+
+# С ground truth для расчета метрик точности
+python benchmark.py --audio test.wav --reference ground_truth.txt
+
+# Генерация примера конфига
+python benchmark.py --generate-sample-config
+```
+
+### Формат YAML конфигурации
+
+Поддерживается два формата:
+
+**1. Shortcut формат (рекомендуется)** - просто укажите framework, model и quantizations:
 
 ```yaml
-# Конфигурация бенчмарка
-model_type: fast_whisper
-model_id: small
-device: cuda
-compute_type: int8_float32
-beam_size: 1
-language: ru
-threads: 2
+benchmarks:
+  # Faster-Whisper с несколькими квантизациями
+  - framework: faster-whisper
+    model: small
+    quantizations: [int8_float32, float16]
+    devices: [cuda]
+    
+  # Whisper.cpp с разными уровнями квантования
+  - framework: whisper.cpp
+    model: ggerganov/whisper.cpp
+    quantizations: [q5_0, q4_0]
+    devices: [cpu]
+    
+  # HuggingFace Whisper (Russian fine-tuned)
+  - framework: huggingface
+    model: openai/whisper-small-ru
+    devices: [cuda]
+```
 
-# Параметры мониторинга
-memory_monitor:
-  sampling_interval_ms: 100
+**2. Полный явный формат** - когда нужен полный контроль:
 
-# Вывод результатов
-output:
-  json: results/benchmark.json
-  csv: results/benchmark.csv
-  markdown: results/report.md
+```yaml
+benchmarks:
+  - framework: faster-whisper
+    model: large-v3
+    quantizations: [int8_float32]
+    devices: [cuda]
+    beam_sizes: [1]
+    compute_type: int8_float32
+    language: ru
+    gpu_id: 0
 ```
 
 ## 📊 Интерпретация метрик

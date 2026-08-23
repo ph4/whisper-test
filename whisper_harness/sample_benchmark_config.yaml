@@ -1,0 +1,33 @@
+# Sample Whisper ASR Benchmark Configuration
+# Usage: python benchmark.py --config this_file.yaml --audio test.wav
+
+benchmarks:
+  # Faster-Whisper with multiple quantizations (shortcut format)
+  - framework: faster-whisper
+    model: small
+    quantizations: [int8_float32, float16]
+    devices: [cuda]
+    beam_sizes: [1, 3]
+    
+  # Whisper.cpp with different quantizations
+  - framework: whisper.cpp
+    model: ggerganov/whisper.cpp
+    quantizations: [q5_0, q4_0]
+    devices: [cpu]
+    threads: 2
+    
+  # HuggingFace Whisper (Russian fine-tuned)
+  - framework: huggingface
+    model: sberbank-ai/whisper-small-ru
+    quantizations: [float16]
+    devices: [cuda]
+    load_in_8bit: false
+    
+  # Full explicit configuration
+  - framework: faster-whisper
+    model: medium
+    quantizations: [int8_float32]
+    devices: [cuda, cpu]
+    beam_sizes: [1]
+    compute_type: int8_float32
+    language: ru

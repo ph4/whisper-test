@@ -1,45 +1,83 @@
-# Конфигурация бенчмарка Whisper ASR
-# Для использования: python cli.py --audio test.wav --config benchmark_config.yaml
+# Whisper ASR Benchmark Configuration
+# Usage: python benchmark.py --config this_file.yaml --audio test.wav
+#
+# Supports two formats:
+# 1. Shortcut format (recommended) - just specify framework, model, and quantizations
+# 2. Full explicit format - specify all parameters
 
-# Выбор модели и бэкенда
-model_type: fast_whisper  # fast_whisper, whisper_cpp, sber_gigaam_ctc, hf_whisper
-model_id: small           # tiny, base, small, medium, large-v3
-device: cuda              # cpu или cuda
-language: ru
+benchmarks:
+  # ===== FASTER-WHISPER SHORTCUT FORMAT =====
+  # Just specify framework, model, and quantizations list
+  # Devices default to [cuda], beam_sizes default to [1]
+  
+  - framework: faster-whisper
+    model: small
+    quantizations: [int8_float32, float16]
+    
+  - framework: faster-whisper
+    model: medium
+    quantizations: [int8_float32]
+    devices: [cuda, cpu]  # Test on both GPU and CPU
+    beam_sizes: [1, 3]    # Test different beam sizes
 
-# Параметры faster-whisper
-compute_type: int8_float32  # int8_float16, int8_float32, float16, float32
-beam_size: 1                # 1, 3, 5 (больше = точнее но медленнее)
 
-# Параметры whisper.cpp
-quantization: q5_0          # q4_0, q5_0, q8_0, f16, f32
-threads: 2                  # Количество CPU потоков (2 для A4-5300)
+  # ===== WHISPER.CPP SHORTCUT FORMAT =====
+  # For whisper.cpp, just specify model and quantizations
+  
+  - framework: whisper.cpp
+    model: ggerganov/whisper.cpp
+    quantizations: [q5_0, q4_0]
+    devices: [cpu]
+    threads: 2
 
-# Параметры Sber GigaAM
-use_onnx: true              # Использовать ONNX для экономии RAM
 
-# Параметры HuggingFace
-torch_dtype: float16        # float16, float32, bfloat16
-load_in_8bit: false         # 8-битная квантизация (требует bitsandbytes)
+  # ===== HUGGINGFACE WHISPER =====
+  # For HF models, quantizations auto-detect based on model
+  # You can optionally specify torch_dtype and load_in_8bit
+  
+  - framework: huggingface
+    model: openai/whisper-small-ru
+    devices: [cuda]
+    # torch_dtype: float16  # Optional, defaults to quantization value
+    # load_in_8bit: false   # Optional, enables 8-bit quantization
 
-# Мониторинг памяти
-memory_monitor:
-  sampling_interval_ms: 100  # Интервал замеров памяти
 
-# Вывод результатов
+  # ===== FULL EXPLICIT FORMAT =====
+  # When you need fine-grained control over all parameters
+  
+  - framework: faster-whisper
+    model: large-v3
+    quantizations: [int8_float32]
+    devices: [cuda]
+    beam_sizes: [1]
+    compute_type: int8_float32  # Explicit compute type
+    language: ru
+    gpu_id: 0
+
+
+  # ===== SBER GIGAAM =====
+  - framework: sber_gigaam_ctc
+    model: ctc
+    use_onnx: true  # Use ONNX for memory efficiency
+
+
+# ===== SYSTEM CONFIGURATION (Optional) =====
+# These override auto-detected system info if needed
+system:
+  # gpu_count: 1
+  # total_vram_gb: 2.0
+  # total_ram_gb: 8.0
+
+
+# ===== BENCHMARK MODE =====
+# quick: Test only small/medium models with minimal configurations
+# full: Test all configurations including large models
+# compare: Compare frameworks only with standard settings
+mode: quick
+
+
+# ===== OUTPUT OPTIONS =====
 output:
-  json: null                 # Путь к JSON файлу или null
-  csv: null                  # Путь к CSV файлу или null
-  markdown: null             # Путь к MD отчету или null
-
-# Тестовое аудио
-audio:
-  path: test.wav             # Путь к аудиофайлу
-  sample_rate: 16000         # Частота дискретизации
-  channels: 1                # Mono = 1, Stereo = 2
-
-# Референс для расчета WER/CER
-reference:
-  enabled: false             # Включить расчет метрик точности
-  path: ground_truth.txt     # Путь к файлу с эталонной транскрипцией
-  generate: false            # Сгенерировать плейсхолдер (для демо)
+  csv: true
+  json: true
+  markdown: true
