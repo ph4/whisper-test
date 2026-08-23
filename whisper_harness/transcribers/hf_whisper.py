@@ -85,7 +85,8 @@ class HuggingFaceWhisperTranscriber(Transcriber):
 
             if self.device == "cuda" and not self.load_in_8bit:
                 self._model.to("cuda")
-                torch.cuda.empty_cache()
+                from utils.memory_monitor import clear_gpu_cache
+                clear_gpu_cache()
 
             self._load_time = time.perf_counter() - start_time
 

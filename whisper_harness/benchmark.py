@@ -473,11 +473,8 @@ class BenchmarkRunner:
         finally:
             # Cleanup
             self.transcriber = None
-            try:
-                import torch
-                torch.cuda.empty_cache()
-            except:
-                pass
+            from utils.memory_monitor import clear_gpu_cache
+            clear_gpu_cache()
         
         return result
 
@@ -587,11 +584,8 @@ class BenchmarkHarness:
                     self.log(f"  ✗ ERROR: {e}")
                     
                 # Clear GPU memory between tests
-                try:
-                    import torch
-                    torch.cuda.empty_cache()
-                except:
-                    pass
+                from utils.memory_monitor import clear_gpu_cache
+                clear_gpu_cache()
                 
                 time.sleep(1.0)  # Cooldown
         

@@ -52,9 +52,8 @@ class FasterWhisperTranscriber(Transcriber):
 
             # Clear CUDA cache before loading to free VRAM
             if self.device == "cuda":
-                import torch
-
-                torch.cuda.empty_cache()
+                from utils.memory_monitor import clear_gpu_cache
+                clear_gpu_cache()
 
             # Map model_id to faster-whisper format
             model_path = self.model_id

@@ -24,19 +24,21 @@ pip install -r requirements.txt
 
 ### Опциональные зависимости
 
+Файл `requirements.txt` содержит все зависимости с комментариями. Для включения опциональных функций раскомментируйте соответствующие строки:
+
 ```bash
-# Для whisper.cpp (рекомендуется q5_0 для баланса скорость/качество)
-pip install pywhispercpp
-
-# Для Sber GigaAM через ONNX (экономит RAM)
-pip install onnxruntime
-
-# Для точного расчета WER
-pip install jiwer
-
-# Для загрузки конфигов из YAML
-pip install pyyaml
+# Отредактировать requirements.txt и раскомментировать нужные строки, затем:
+pip install -r requirements.txt
 ```
+
+**Опционально:**
+
+- **PyTorch** (для улучшенного управления VRAM): Если не установлен, используется ctypes + CUDA driver API
+- **whisper.cpp** (pywhispercpp): Для квантованных моделей
+- **ONNX Runtime** (onnxruntime-gpu): Для Sber GigaAM и других ONNX моделей (рекомендуется для систем с малым RAM)
+- **Инструменты разработки** (pytest, black, flake8): Для тестирования и разработки
+
+См. раздел "Platform-Specific Notes" в `requirements.txt` для деталей установки.
 
 ## 📁 Структура проекта
 
@@ -54,8 +56,12 @@ whisper_harness/
 │   ├── metrics.py           # Расчет WER, CER, RTF
 │   └── memory_monitor.py    # Мониторинг RAM/VRAM
 ├── cli.py                   # Точка входа CLI
-├── requirements.txt         # Зависимости
-└── README.md                # Документация
+├── benchmark.py             # Бенчмарк харнесс с YAML поддержкой
+├── test_harness.py          # Тесты для бенчмарк харнесса
+├── requirements.txt         # Все зависимости (обязательные и опциональные)
+├── sample_benchmark_config.yaml  # Пример YAML конфигурации
+├── README.md                # Документация
+└── YAML_DESIGN.md           # Полная спецификация YAML конфигурации
 ```
 
 ## 💡 Примеры использования (CLI)
