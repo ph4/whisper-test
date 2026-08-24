@@ -4,13 +4,14 @@
 
 ## Возможности
 
-- **Поддержка фреймворков**: faster-whisper, whisper.cpp
+- **Поддержка фреймворков**: faster-whisper, whisper.cpp, transcribe.cpp (GGUF), HuggingFace transformers
 - **Модели**: tiny, base, small, medium, large-v2, large-v3 + русскоязычные модели
-- **Квантизации**: float32, float16, int8, int8_float16, int8_float32
+- **Квантизации**: float32, float16, int8, int8_float16, int8_float32, GGUF (Q4_0, Q5_K_M, Q8_0, etc.)
 - **Мониторинг памяти**: RAM и VRAM с интервалом 100мс
 - **Метрики**: RTF, WER, CER, время загрузки/транскрипции
 - **Режимы**: quick, full, compare, optimal
 - **Отчеты**: CSV, JSON, Markdown
+- **Self-Test**: Автоматическая проверка установки библиотек и загрузки моделей (CPU/GPU)
 
 ## Установка
 
@@ -74,7 +75,7 @@ python whisper_benchmark.py \
 |----------|----------|--------------|
 | `--audio` | Путь к аудиофайлу | (обязательно) |
 | `--ground-truth` | Эталонная транскрипция для WER/CER | None |
-| `--frameworks` | Фреймворки через запятую | faster-whisper |
+| `--frameworks` | Фреймворки через запятую (faster-whisper, whisper.cpp, transcribe.cpp, huggingface) | faster-whisper |
 | `--models` | Модели через запятую | tiny,base,small,medium,large-v2,large-v3 |
 | `--quantizations` | Квантизации через запятую | int8,int8_float16,int8_float32,float16,float32 |
 | `--beam-sizes` | Размеры луча через запятую | 1,3,5 |
@@ -87,6 +88,46 @@ python whisper_benchmark.py \
 | `--monitor-memory-interval` | Интервал мониторинга (мс) | 100 |
 | `--warmup-runs` | Прогревочные запуски | 1 |
 | `--convert-audio` | Конвертировать аудио в WAV | False |
+
+## 🔧 Self-Test / Диагностика
+
+**Проверка установки и работоспособности всех фреймворков:**
+
+```bash
+# Перейти в директорию whisper_harness
+cd whisper_harness
+
+# Быстрая проверка импортов библиотек
+python -m transcribers.self_test --quick
+
+# Полное тестирование с загрузкой минимальных моделей (tiny) на CPU и GPU
+python -m transcribers.self_test
+
+# Тест конкретного фреймворка
+python -m transcribers.self_test --framework faster-whisper
+python -m transcribers.self_test --framework whisper.cpp
+python -m transcribers.self_test --framework transcribe.cpp
+python -m transcribers.self_test --framework huggingface
+
+# Только GPU или только CPU тесты
+python -m transcribers.self_test --gpu-only
+python -m transcribers.self_test --cpu-only
+
+# Экспорт результатов в JSON
+python -m transcribers.self_test --output selftest_results.json
+```
+
+**Что проверяется:**
+1. ✅ Наличие установленных библиотек (faster_whisper, pywhispercpp, transformers, onnxruntime, etc.)
+2. ✅ Возможность загрузки минимальной модели (tiny) для каждого фреймворка
+3. ✅ Работа на CPU и GPU (если доступно)
+4. ✅ Базовая транскрипция тестового аудио (1 секунда тишины)
+
+**Интерпретация результатов:**
+- ✅ **PASSED** - Библиотека установлена и модель загружается успешно
+- ❌ **FAILED** - Ошибка: требуется установка библиотеки или исправление конфигурации
+- ⚠️ **SKIPPED** - Пропущено (например, CUDA недоступен или quick mode)
+- ⚡ **WARNING** - Работает, но есть ограничения (например, нет GPU или используется fallback)
 
 ## Режимы работы
 
