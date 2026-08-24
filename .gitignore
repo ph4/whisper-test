@@ -1,1 +1,48 @@
-Nothing should be ignored based on the provided changes. The only modified file is a Python source file (`whisper_harness/transcribers/self_test.py`), which should not be added to .gitignore.
+```
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# Dependencies
+.venv/
+venv/
+.env
+.env.local
+*.env.*
+
+# Build artifacts
+build/
+dist/
+*.so
+*.dylib
+*.dll
+
+# Logs
+*.log
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+```
+
+*.mp3
+*.wav
+*.ogg
+whisper_harness/config.yml
+demo_results/
