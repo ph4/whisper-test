@@ -123,7 +123,7 @@ class FasterWhisperTranscriber(Transcriber):
                 audio_path,
                 language=language,
                 beam_size=self.beam_size,
-                vad_filter=True,  # Enable VAD for better performance
+                vad_filter=False,  # Disable VAD to prevent OOM on memory-constrained systems
             )
 
             text = " ".join(segment.text for segment in segments)

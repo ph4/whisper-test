@@ -284,11 +284,9 @@ def generate_test_configs(
                 quantizations = ["q5_0"]
             elif framework in ["huggingface", "hf_whisper"]:
                 quantizations = ["float16"]
-            elif framework in ["sber", "sber_gigaam"]:
-                quantizations = ["float32"]  # Sber models typically float32
             elif framework in ["onnx-asr", "onnx"]:
                 quantizations = ["float32"]
-            elif framework in ["transcribe.cpp"]:
+            elif framework in ["transcribe.cpp", "transcribe_cpp"]:
                 quantizations = ["Q5_K_M"]
         
         # Get devices - support both singular and plural
@@ -358,7 +356,7 @@ class BenchmarkRunner:
             FasterWhisperTranscriber,
             WhisperCppTranscriber,
             HuggingFaceWhisperTranscriber,
-            SberGigaAMTranscriber,
+            TranscribeCppTranscriber,
         )
         
         framework_map = {
@@ -368,8 +366,8 @@ class BenchmarkRunner:
             "whisper_cpp": WhisperCppTranscriber,
             "huggingface": HuggingFaceWhisperTranscriber,
             "hf_whisper": HuggingFaceWhisperTranscriber,
-            "sber": SberGigaAMTranscriber,
-            "sber_gigaam_ctc": SberGigaAMTranscriber,
+            "transcribe.cpp": TranscribeCppTranscriber,
+            "transcribe_cpp": TranscribeCppTranscriber,
         }
         
         transcriber_class = framework_map.get(self.config.framework.lower())
@@ -391,8 +389,12 @@ class BenchmarkRunner:
         elif self.config.framework in ["huggingface", "hf_whisper"]:
             kwargs["torch_dtype"] = self.config.torch_dtype or self.config.quantization
             kwargs["load_in_8bit"] = self.config.load_in_8bit
-        elif self.config.framework in ["sber", "sber_gigaam_ctc"]:
-            kwargs["use_onnx"] = self.config.use_onnx
+        elif self.config.framework in ["transcribe.cpp", "transcribe_cpp"]:
+            kwargs["quantization"] = self.config.quantization
+            kwargs["n_threads"] = self.config.threads
+            if self.config.offload_config:
+                kwargs["use_gpu"] = self.config.device == "cuda"
+                kwargs["offload_layers"] = self.config.offload_config.layer_count
         
         self.transcriber = transcriber_class(**kwargs)
         
@@ -764,6 +766,13 @@ benchmarks:
     quantizations: [float16]
     devices: [cuda]
     load_in_8bit: false
+    
+  # Transcribe.cpp with GGUF quantized GigaAM models
+  - framework: transcribe.cpp
+    model: handy-computer/gigaam-v3-e2e-rnnt-gguf
+    quantizations: [Q5_K_M, Q6_K, Q8_0]
+    devices: [cpu]
+    threads: 4
     
   # Full explicit configuration
   - framework: faster-whisper

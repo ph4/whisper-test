@@ -46,22 +46,22 @@ pip install -r requirements.txt
 whisper_harness/
 ├── transcribers/
 │   ├── __init__.py
-│   ├── base.py              # Базовый класс Transcriber
-│   ├── faster_whisper.py    # Адаптер для faster-whisper
-│   ├── whisper_cpp.py       # Адаптер для whisper.cpp
-│   ├── sber.py              # Адаптер для Sber GigaAM
-│   └── hf_whisper.py        # Адаптер для HuggingFace Whisper
+│   ├── base.py                    # Базовый класс Transcriber
+│   ├── faster_whisper.py          # Адаптер для faster-whisper
+│   ├── whisper_cpp.py             # Адаптер для whisper.cpp
+│   ├── hf_whisper.py              # Адаптер для HuggingFace Whisper
+│   └── transcribe_cpp.py          # Адаптер для GGUF моделей (GigaAM и др.)
 ├── utils/
 │   ├── __init__.py
-│   ├── metrics.py           # Расчет WER, CER, RTF
-│   └── memory_monitor.py    # Мониторинг RAM/VRAM
-├── cli.py                   # Точка входа CLI
-├── benchmark.py             # Бенчмарк харнесс с YAML поддержкой
-├── test_harness.py          # Тесты для бенчмарк харнесса
-├── requirements.txt         # Все зависимости (обязательные и опциональные)
-├── sample_benchmark_config.yaml  # Пример YAML конфигурации
-├── README.md                # Документация
-└── YAML_DESIGN.md           # Полная спецификация YAML конфигурации
+│   ├── metrics.py                 # Расчет WER, CER, RTF
+│   └── memory_monitor.py          # Мониторинг RAM/VRAM
+├── cli.py                         # Точка входа CLI
+├── benchmark.py                   # Бенчмарк харнесс с YAML поддержкой
+├── test_harness.py                # Тесты для бенчмарк харнесса
+├── requirements.txt               # Все зависимости (обязательные и опциональные)
+├── sample_benchmark_config.yaml   # Пример YAML конфигурации
+├── README.md                      # Документация
+└── YAML_DESIGN.md                 # Полная спецификация YAML конфигурации
 ```
 
 ## 💡 Примеры использования (CLI)
@@ -78,10 +78,10 @@ python cli.py --audio test.wav --model-type fast_whisper --model-id medium --com
 python cli.py --audio test.wav --model-type whisper_cpp --model-id ggerganov/whisper.cpp --quantization q5_0 --language ru
 ```
 
-### 3. Тест Sber GigaAM через ONNX (экономия RAM)
+### 3. Тест Transcribe.cpp с GGUF квантованной GigaAM моделью (РЕКОМЕНДУЕТСЯ для систем с малой памятью)
 
 ```bash
-python cli.py --audio test.wav --model-type sber_gigaam_ctc --use-onnx
+python cli.py --audio test.wav --model-type transcribe_cpp --model-id handy-computer/gigaam-v3-e2e-rnnt-gguf --quantization Q5_K_M --language ru
 ```
 
 ### 4. Тест с оценкой точности (WER/CER)
