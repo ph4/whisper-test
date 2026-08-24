@@ -311,7 +311,7 @@ class TranscriberSelfTest:
                     transcriber = WhisperCppTranscriber(
                         model_id="ggerganov/whisper.cpp",
                         device=device,
-                        quantization="q5_0",
+                        quantization="q5_1",
                         n_threads=2,
                         use_gpu=use_gpu,
                         gpu_layers=None  # Auto-detect full offloading for GPU
