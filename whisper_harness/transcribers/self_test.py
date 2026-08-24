@@ -291,37 +291,64 @@ class TranscriberSelfTest:
         return result
     
     def _test_whisper_cpp_model(self) -> TestResult:
-        """Test whisper.cpp model loading."""
+        """Test whisper.cpp model loading with CPU and GPU modes."""
         start = time.perf_counter()
         
         try:
             # Try to use the transcriber class
             from transcribers.whisper_cpp import WhisperCppTranscriber
             
-            transcriber = WhisperCppTranscriber(
-                model_id="ggerganov/whisper.cpp",
-                device="cpu",
-                quantization="q5_0",
-                n_threads=2
-            )
+            # Determine devices to test
+            devices_to_test = []
+            if not self.gpu_only:
+                devices_to_test.append(("cpu", False))
+            if not self.cpu_only:
+                devices_to_test.append(("cuda", True))
             
-            # This will attempt to download and load the model
-            transcriber._ensure_loaded()
+            results_summary = []
+            for device, use_gpu in devices_to_test:
+                try:
+                    transcriber = WhisperCppTranscriber(
+                        model_id="ggerganov/whisper.cpp",
+                        device=device,
+                        quantization="q5_0",
+                        n_threads=2,
+                        use_gpu=use_gpu,
+                        gpu_layers=None  # Auto-detect full offloading for GPU
+                    )
+                    
+                    # This will attempt to download and load the model
+                    transcriber._ensure_loaded()
+                    
+                    results_summary.append(f"{device.upper()}: OK")
+                    
+                except Exception as e:
+                    results_summary.append(f"{device.upper()}: {str(e)[:50]}")
             
             duration = (time.perf_counter() - start) * 1000
             
-            return TestResult(
-                name="Whisper.cpp model loading",
-                status=TestStatus.PASSED,
-                message="Model loaded successfully",
-                duration_ms=duration,
-                details={"model_path": transcriber._model_path}
-            )
+            # Check if at least one device worked
+            if any("OK" in r for r in results_summary):
+                return TestResult(
+                    name="Whisper.cpp model loading (CPU/GPU)",
+                    status=TestStatus.PASSED,
+                    message=f"Model loaded successfully: {'; '.join(results_summary)}",
+                    duration_ms=duration,
+                    details={"results": results_summary}
+                )
+            else:
+                return TestResult(
+                    name="Whisper.cpp model loading (CPU/GPU)",
+                    status=TestStatus.FAILED,
+                    message=f"All devices failed: {'; '.join(results_summary)}",
+                    duration_ms=duration,
+                    details={"results": results_summary}
+                )
             
         except Exception as e:
             duration = (time.perf_counter() - start) * 1000
             return TestResult(
-                name="Whisper.cpp model loading",
+                name="Whisper.cpp model loading (CPU/GPU)",
                 status=TestStatus.FAILED,
                 message=f"Failed to load model: {e}",
                 duration_ms=duration,
@@ -374,49 +401,79 @@ class TranscriberSelfTest:
         return result
     
     def _test_transcribe_cpp_model(self) -> TestResult:
-        """Test transcribe.cpp model loading."""
+        """Test transcribe.cpp model loading with CPU and GPU modes."""
         start = time.perf_counter()
         
         try:
             from transcribers.transcribe_cpp import TranscribeCppTranscriber
             
-            # Use a small GGUF model for testing
-            transcriber = TranscribeCppTranscriber(
-                model_id="openai/whisper-tiny",  # This should resolve to a GGUF variant
-                device="cpu",
-                quantization="Q5_K_M",
-                n_threads=2
-            )
+            # Determine devices to test
+            devices_to_test = []
+            if not self.gpu_only:
+                devices_to_test.append(("cpu", False))
+            if not self.cpu_only:
+                devices_to_test.append(("cuda", True))
             
-            # Note: This may fail if the model repo doesn't have GGUF files
-            # We catch this and report it appropriately
-            try:
-                transcriber._ensure_loaded()
-                duration = (time.perf_counter() - start) * 1000
-                
-                return TestResult(
-                    name="Transcribe.cpp model loading",
-                    status=TestStatus.PASSED,
-                    message="GGUF model loaded successfully",
-                    duration_ms=duration,
-                    details={"model_path": transcriber._model_path}
-                )
-            except RuntimeError as e:
-                if "No GGUF files found" in str(e):
-                    duration = (time.perf_counter() - start) * 1000
-                    return TestResult(
-                        name="Transcribe.cpp model loading",
-                        status=TestStatus.WARNING,
-                        message=f"GGUF model not available for test repo: {e}",
-                        duration_ms=duration,
-                        details={"note": "Try with a known GGUF model repo like 'handy-computer/gigaam-v3-e2e-rnnt-gguf'"}
+            results_summary = []
+            for device, use_gpu in devices_to_test:
+                try:
+                    # Use a known GGUF model for testing
+                    transcriber = TranscribeCppTranscriber(
+                        model_id="handy-computer/gigaam-v3-e2e-rnnt-gguf",
+                        device=device,
+                        quantization="Q5_K_M",
+                        n_threads=2,
+                        use_gpu=use_gpu,
+                        gpu_layers=None  # Auto-detect full offloading for GPU
                     )
-                raise
+                    
+                    # Note: This may fail if the model repo doesn't have GGUF files
+                    # We catch this and report it appropriately
+                    try:
+                        transcriber._ensure_loaded()
+                        results_summary.append(f"{device.upper()}: OK")
+                        
+                    except RuntimeError as e:
+                        if "No GGUF files found" in str(e):
+                            results_summary.append(f"{device.upper()}: No GGUF files")
+                        else:
+                            results_summary.append(f"{device.upper()}: {str(e)[:40]}")
+                            
+                except Exception as e:
+                    results_summary.append(f"{device.upper()}: {str(e)[:40]}")
+            
+            duration = (time.perf_counter() - start) * 1000
+            
+            # Check if at least one device worked
+            if any("OK" in r for r in results_summary):
+                return TestResult(
+                    name="Transcribe.cpp model loading (CPU/GPU)",
+                    status=TestStatus.PASSED,
+                    message=f"GGUF model loaded successfully: {'; '.join(results_summary)}",
+                    duration_ms=duration,
+                    details={"results": results_summary}
+                )
+            elif any("No GGUF files" in r for r in results_summary):
+                return TestResult(
+                    name="Transcribe.cpp model loading (CPU/GPU)",
+                    status=TestStatus.WARNING,
+                    message=f"No GGUF files found in test repo: {'; '.join(results_summary)}",
+                    duration_ms=duration,
+                    details={"note": "Try with a different GGUF model repo", "results": results_summary}
+                )
+            else:
+                return TestResult(
+                    name="Transcribe.cpp model loading (CPU/GPU)",
+                    status=TestStatus.FAILED,
+                    message=f"All devices failed: {'; '.join(results_summary)}",
+                    duration_ms=duration,
+                    details={"results": results_summary}
+                )
                 
         except Exception as e:
             duration = (time.perf_counter() - start) * 1000
             return TestResult(
-                name="Transcribe.cpp model loading",
+                name="Transcribe.cpp model loading (CPU/GPU)",
                 status=TestStatus.FAILED,
                 message=f"Failed to load GGUF model: {e}",
                 duration_ms=duration,

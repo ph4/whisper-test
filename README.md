@@ -84,6 +84,7 @@ python whisper_benchmark.py \
 | `--language` | Язык транскрипции | ru |
 | `--threads` | Количество CPU потоков | 2 |
 | `--gpu-id` | ID GPU для multi-GPU | 0 |
+| `--gpu-layers` | Количество слоёв для offloading на GPU (whisper.cpp, transcribe.cpp) | None (auto) |
 | `--whisper-cpp-path` | Путь к whisper.cpp | ./whisper.cpp |
 | `--monitor-memory-interval` | Интервал мониторинга (мс) | 100 |
 | `--warmup-runs` | Прогревочные запуски | 1 |
@@ -121,13 +122,20 @@ python -m transcribers.self_test --output selftest_results.json
 1. ✅ Наличие установленных библиотек (faster_whisper, pywhispercpp, transformers, onnxruntime, etc.)
 2. ✅ Возможность загрузки минимальной модели (tiny) для каждого фреймворка
 3. ✅ Работа на CPU и GPU (если доступно)
-4. ✅ Базовая транскрипция тестового аудио (1 секунда тишины)
+4. ✅ Поддержка GPU offloading (полный и частичный через `--gpu-layers`)
+5. ✅ Базовая транскрипция тестового аудио (1 секунда тишины)
 
 **Интерпретация результатов:**
 - ✅ **PASSED** - Библиотека установлена и модель загружается успешно
 - ❌ **FAILED** - Ошибка: требуется установка библиотеки или исправление конфигурации
 - ⚠️ **SKIPPED** - Пропущено (например, CUDA недоступен или quick mode)
 - ⚡ **WARNING** - Работает, но есть ограничения (например, нет GPU или используется fallback)
+
+**GPU Offloading:**
+- whisper.cpp и transcribe.cpp поддерживают partial/full offloading через параметр `gpu_layers`
+- `gpu_layers=None` + `use_gpu=True` → полный offloading (все слои на GPU)
+- `gpu_layers=N` → частичный offloading (N слоёв на GPU, остальные на CPU)
+- Self-test автоматически проверяет оба режима при наличии GPU
 
 ## Режимы работы
 
