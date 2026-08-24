@@ -64,6 +64,37 @@ whisper_harness/
 └── YAML_DESIGN.md                 # Полная спецификация YAML конфигурации
 ```
 
+## 🧪 Self-Test / Диагностика
+
+Проверка установки всех библиотек и возможности загрузки моделей:
+
+```bash
+# Полное тестирование всех фреймворков (CPU + GPU)
+python -m transcribers.self_test
+
+# Быстрая проверка только импортов библиотек
+python -m transcribers.self_test --quick
+
+# Тестирование конкретного фреймворка
+python -m transcribers.self_test --framework faster-whisper
+python -m transcribers.self_test --framework whisper.cpp
+python -m transcribers.self_test --framework transcribe.cpp
+python -m transcribers.self_test --framework huggingface
+
+# Только GPU или только CPU
+python -m transcribers.self_test --gpu-only
+python -m transcribers.self_test --cpu-only
+
+# Экспорт результатов в JSON
+python -m transcribers.self_test --output test_results.json
+```
+
+**Что проверяется:**
+1. ✅ Наличие установленных библиотек
+2. ✅ Возможность загрузки минимальной модели (tiny)
+3. ✅ Работа на CPU и GPU (если доступно)
+4. ✅ Базовая транскрипция тестового аудио
+
 ## 💡 Примеры использования (CLI)
 
 ### 1. Быстрый тест Faster-Whisper (оптимально для 2GB VRAM)
@@ -289,14 +320,17 @@ offload_configs:
 
 ### 📋 Поддерживаемые фреймворки
 
-| Framework | Shortcut | Plural/Singular | Offload Support | Auto Quantizations |
-|-----------|----------|-----------------|-----------------|-------------------|
-| faster-whisper | ✅ | ✅ | ❌ | ✅ |
-| whisper.cpp | ✅ | ✅ | ⚠️ (via main.cpp params) | ✅ |
-| huggingface | ✅ | ✅ | ❌ (uses device_map) | ✅ |
-| sber | ✅ | ✅ | ❌ | ✅ |
-| onnx-asr | ✅ | ✅ | ✅ (execution providers) | ✅ |
-| transcribe.cpp | ✅ | ✅ | ✅ (layer offloading) | ✅ |
+| Framework | Shortcut | Plural/Singular | Offload Support | Auto Quantizations | Self-Test |
+|-----------|----------|-----------------|-----------------|-------------------|-----------|
+| faster-whisper | ✅ | ✅ | ❌ | ✅ | ✅ |
+| whisper.cpp | ✅ | ✅ | ⚠️ (via main.cpp params) | ✅ | ✅ |
+| huggingface | ✅ | ✅ | ❌ (uses device_map) | ✅ | ✅ |
+| sber | ✅ | ✅ | ❌ | ✅ | ✅ |
+| onnx-asr | ✅ | ✅ | ✅ (execution providers) | ✅ | ⚠️ |
+| transcribe.cpp | ✅ | ✅ | ✅ (layer offloading) | ✅ | ✅ |
+
+**Примечание:** Self-Test проверяет установку библиотек и загрузку минимальных моделей (tiny) на CPU/GPU.
+Запустите `python -m transcribers.self_test` для автоматической проверки всех фреймворков.
 
 ### 🔑 Ключевые особенности
 

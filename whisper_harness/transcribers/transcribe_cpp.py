@@ -17,7 +17,7 @@ class TranscribeCppTranscriber(Transcriber):
         quantization: GGUF quantization type (Q4_0, Q5_K_M, Q6_K, Q8_0, etc.).
         n_threads: Number of CPU threads for inference.
         use_gpu: Enable GPU acceleration if available.
-        offload_layers: Number of layers to offload to GPU (for partial offloading).
+        gpu_layers: Number of layers to offload to GPU (for partial/full offloading).
     """
 
     def __init__(
@@ -27,7 +27,7 @@ class TranscribeCppTranscriber(Transcriber):
         quantization: str = "Q5_K_M",
         n_threads: int = 4,
         use_gpu: bool = False,
-        offload_layers: int | None = None,
+        gpu_layers: int | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize Transcribe.cpp transcriber.
@@ -39,15 +39,16 @@ class TranscribeCppTranscriber(Transcriber):
             quantization: GGUF quantization type (Q4_0, Q4_K_S, Q5_K_M, Q6_K, Q8_0, F16, F32).
             n_threads: Number of CPU threads for inference.
             use_gpu: Enable GPU acceleration (requires CUDA).
-            offload_layers: Number of transformer layers to offload to GPU.
-                           If None, auto-detect based on VRAM.
+            gpu_layers: Number of transformer layers to offload to GPU.
+                       If None and use_gpu=True, attempts full offloading (999 layers).
+                       For partial offloading, set to specific number (e.g., 10, 20).
             **kwargs: Additional parameters passed to whisper_main.
         """
         super().__init__(model_id, device, **kwargs)
         self.quantization = quantization
         self.n_threads = n_threads
         self.use_gpu = use_gpu if device == "cuda" else False
-        self.offload_layers = offload_layers
+        self.gpu_layers = gpu_layers
         self._model_path: str | None = None
         self._downloaded_model: bool = False
 
@@ -194,14 +195,14 @@ class TranscribeCppTranscriber(Transcriber):
             "memory_peak_mb": monitor.peak_ram_mb,
             "vram_peak_mb": monitor.peak_vram_mb if monitor.peak_vram_mb else None,
             "framework": "transcribe.cpp",
-            "device": self.device,
+            "device": "gpu" if self.use_gpu else "cpu",
             "quantization": self.quantization,
             "threads": self.n_threads,
-            "gpu_offload": self.use_gpu,
+            "gpu_layers": self.gpu_layers if self.use_gpu else 0,
         }
 
     def _transcribe_pywhispercpp(self, audio_path: str, language: str) -> str:
-        """Transcribe using pywhispercpp library."""
+        """Transcribe using pywhispercpp library with GPU offloading."""
         import pywhispercpp
         import numpy as np
         from scipy.io import wavfile
@@ -216,12 +217,24 @@ class TranscribeCppTranscriber(Transcriber):
             num_samples = int(len(audio) * 16000 / sample_rate)
             audio = resample(audio, num_samples)
         
+        # Configure model parameters with GPU offloading
+        model_kwargs = {
+            "model_path": self._model_path,
+            "n_threads": self.n_threads,
+            "language": language,
+        }
+        
+        # Add GPU offloading if enabled
+        if self.use_gpu:
+            model_kwargs["use_gpu"] = True
+            if self.gpu_layers is not None:
+                model_kwargs["n_gpu_layers"] = self.gpu_layers
+            else:
+                # Full offloading by default
+                model_kwargs["n_gpu_layers"] = 999
+        
         # Initialize model
-        model = pywhispercpp.Model(
-            model_path=self._model_path,
-            n_threads=self.n_threads,
-            language=language,
-        )
+        model = pywhispercpp.Model(**model_kwargs)
         
         # Run transcription
         segments = model.transcribe(audio)
@@ -230,7 +243,7 @@ class TranscribeCppTranscriber(Transcriber):
         return text
 
     def _transcribe_whisper_cpp(self, audio_path: str, language: str) -> str:
-        """Transcribe using whisper_cpp library."""
+        """Transcribe using whisper_cpp library with GPU offloading."""
         import whisper_cpp
         import numpy as np
         from scipy.io import wavfile
@@ -245,8 +258,22 @@ class TranscribeCppTranscriber(Transcriber):
             num_samples = int(len(audio) * 16000 / sample_rate)
             audio = resample(audio, num_samples)
         
-        # Initialize context
-        ctx = whisper_cpp.whisper_init_from_file(self._model_path.encode())
+        # Configure context parameters with GPU offloading
+        ctx_params = whisper_cpp.whisper_context_default_params()
+        ctx_params.use_gpu = self.use_gpu
+        
+        if self.use_gpu:
+            if self.gpu_layers is not None:
+                ctx_params.n_gpu_layers = self.gpu_layers
+            else:
+                # Full offloading by default
+                ctx_params.n_gpu_layers = 999
+        
+        # Initialize context with parameters
+        ctx = whisper_cpp.whisper_init_from_file_with_params(
+            self._model_path.encode(),
+            ctx_params
+        )
         
         if ctx is None:
             raise RuntimeError("Failed to initialize whisper.cpp context")

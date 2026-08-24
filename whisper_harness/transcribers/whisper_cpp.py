@@ -24,10 +24,14 @@ class WhisperCppTranscriber(Transcriber):
     def __init__(
         self,
         model_id: str = "ggerganov/whisper.cpp",
+        model_prefix: str = "ggml",
+        model_size: str = "base",
+        model_lang: str = None,
         device: str = "cpu",
         quantization: str = "q5_0",
         n_threads: int = 2,
         use_gpu: bool = False,
+        gpu_layers: int | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize Whisper.cpp transcriber.
@@ -38,12 +42,18 @@ class WhisperCppTranscriber(Transcriber):
             quantization: Quantization type for GGML model.
             n_threads: Number of CPU threads.
             use_gpu: Enable GPU acceleration.
+            gpu_layers: Number of layers to offload to GPU (for partial/full offloading).
+                       If None and use_gpu=True, attempts full offloading.
             **kwargs: Additional parameters.
         """
         super().__init__(model_id, device, **kwargs)
+        self.model_lang = model_lang
+        self.model_prefix = model_prefix
+        self.model_size = model_size
         self.quantization = quantization
         self.n_threads = n_threads
-        self.use_gpu = use_gpu or (device == "cuda")
+        self.use_gpu = use_gpu if device == "cuda" else False
+        self.gpu_layers = gpu_layers
         self._model_path: str | None = None
 
     def _download_model(self) -> str:
@@ -65,12 +75,10 @@ class WhisperCppTranscriber(Transcriber):
             quant_suffix = quant_map.get(self.quantization, self.quantization)
 
             # Determine model file based on model_id
-            if self.model_id == "ggerganov/whisper.cpp":
-                # Default whisper.cpp models
-                model_file = f"ggml-{quant_suffix}.bin"
+            if self.model_lang is not None:
+                model_file = f"{self.model_prefix}-{self.model_size}.{self.model_lang}-{quant_suffix}.bin"
             else:
-                # Custom models (e.g., Russian fine-tunes)
-                model_file = f"ggml-model-{quant_suffix}.bin"
+                model_file = f"{self.model_prefix}-{self.model_size}-{quant_suffix}.bin"
 
             model_path = hf_hub_download(
                 repo_id=self.model_id,
@@ -104,15 +112,27 @@ class WhisperCppTranscriber(Transcriber):
             raise RuntimeError(f"Failed to load whisper.cpp model: {e}") from e
 
     def _transcribe_with_pywhispercpp(self, audio_path: str, language: str) -> dict[str, Any] | None:
-        """Try transcription using pywhispercpp library."""
+        """Try transcription using pywhispercpp library with GPU offloading."""
         try:
             from pywhispercpp.model import Model
 
-            model = Model(
-                model=self._model_path,  # type: ignore[arg-type]
-                language=language,
-                threads=self.n_threads,
-            )
+            # Configure GPU offloading
+            model_kwargs = {
+                "model": self._model_path,
+                "language": language,
+                "threads": self.n_threads,
+            }
+            
+            # Add GPU offloading if enabled
+            if self.use_gpu:
+                model_kwargs["use_gpu"] = True
+                if self.gpu_layers is not None:
+                    model_kwargs["n_gpu_layers"] = self.gpu_layers
+                else:
+                    # Full offloading by default when GPU is enabled
+                    model_kwargs["n_gpu_layers"] = 999
+
+            model = Model(**model_kwargs)
 
             start_time = time.perf_counter()
             segments = model.transcribe(audio_path)
@@ -131,7 +151,7 @@ class WhisperCppTranscriber(Transcriber):
             return None
 
     def _transcribe_with_subprocess(self, audio_path: str, language: str) -> dict[str, Any]:
-        """Fallback transcription using whisper.cpp binary via subprocess."""
+        """Fallback transcription using whisper.cpp binary via subprocess with GPU offloading."""
         # Find whisper.cpp binary
         binary_names = ["whisper-cli", "main", "whisper-main"]
         binary_path: str | None = None
@@ -167,8 +187,14 @@ class WhisperCppTranscriber(Transcriber):
             "--no-timestamps",
         ]
 
+        # Configure GPU offloading
         if self.use_gpu:
-            cmd.extend(["-ngl", "1"])  # Offload to GPU
+            if self.gpu_layers is not None:
+                # Partial offloading: specific number of layers
+                cmd.extend(["-ngl", str(self.gpu_layers)])
+            else:
+                # Full offloading: all layers to GPU
+                cmd.extend(["-ngl", "999"])
 
         result = subprocess.run(
             cmd,
@@ -241,6 +267,7 @@ class WhisperCppTranscriber(Transcriber):
             "device": "gpu" if self.use_gpu else "cpu",
             "threads": self.n_threads,
             "quantization": self.quantization,
+            "gpu_layers": self.gpu_layers if self.use_gpu else 0,
         }
 
     def _get_audio_duration(self, audio_path: str) -> float:
