@@ -5,6 +5,7 @@ from transcribers.faster_whisper import FasterWhisperTranscriber
 from transcribers.whisper_cpp import WhisperCppTranscriber
 from transcribers.hf_whisper import HuggingFaceWhisperTranscriber
 from transcribers.transcribe_cpp import TranscribeCppTranscriber
+from transcribers.sber import SberGigaAMTranscriber
 
 __all__ = [
     "Transcriber",
@@ -12,6 +13,7 @@ __all__ = [
     "WhisperCppTranscriber",
     "HuggingFaceWhisperTranscriber",
     "TranscribeCppTranscriber",
+    "SberGigaAMTranscriber",
 ]
 
 
