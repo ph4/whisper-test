@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """CLI entry point for Whisper transcription harness.
 
-Supports multiple ASR backends: faster-whisper, whisper.cpp, Sber GigaAM, and HuggingFace.
+Supports multiple ASR backends: faster-whisper, whisper.cpp, transcribe.cpp (GGUF), and HuggingFace.
 Optimized for resource-constrained systems (GTX 1050 2GB, 4-8GB RAM).
 
 Usage:
     python cli.py --audio test.wav --model-type fast_whisper --model-id medium --compute-type int8_float32
     python cli.py --audio test.wav --model-type whisper_cpp --model-id ggerganov/whisper.cpp --quantization q5_0
-    python cli.py --audio test.wav --model-type sber_gigaam_ctc --reference ground_truth.txt
+    python cli.py --audio test.wav --model-type transcribe_cpp --model-id handy-computer/gigaam-v3-e2e-rnnt-gguf --quantization Q5_K_M
 """
 
 import argparse
@@ -53,9 +53,8 @@ def create_transcriber(
         "faster_whisper": FasterWhisperTranscriber,
         "whisper_cpp": WhisperCppTranscriber,
         "whisper.cpp": WhisperCppTranscriber,
-        "sber_gigaam_ctc": SberGigaAMTranscriber,
-        "sber_gigaam_rnnt": SberGigaAMTranscriber,
-        "sber": SberGigaAMTranscriber,
+        "transcribe_cpp": TranscribeCppTranscriber,
+        "transcribe.cpp": TranscribeCppTranscriber,
         "hf_whisper": HuggingFaceWhisperTranscriber,
         "huggingface": HuggingFaceWhisperTranscriber,
     }
@@ -67,10 +66,7 @@ def create_transcriber(
             f"Available: {', '.join(transcriber_map.keys())}"
         )
 
-    # Special handling for Sber model type
-    if model_type.lower() in ["sber_gigaam_ctc", "sber_gigaam_rnnt"]:
-        kwargs["model_id"] = "ctc" if "ctc" in model_type.lower() else "rnnt"
-
+    # Remove special handling for Sber model type since we removed it
     return transcriber_class(model_id=model_id, device=device, **kwargs)
 
 
@@ -121,8 +117,8 @@ Examples:
   # Whisper.cpp with q5_0 quantization
   python cli.py --audio test.wav --model-type whisper_cpp --quantization q5_0
 
-  # Sber GigaAM with ONNX (memory efficient)
-  python cli.py --audio test.wav --model-type sber_gigaam_ctc --use-onnx
+  # Transcribe.cpp with GGUF quantized GigaAM model
+  python cli.py --audio test.wav --model-type transcribe_cpp --model-id handy-computer/gigaam-v3-e2e-rnnt-gguf --quantization Q5_K_M
 
   # HuggingFace Whisper with reference for WER calculation
   python cli.py --audio test.wav --model-type hf_whisper --model-id sberbank-ai/whisper-small-ru --reference ground_truth.txt
@@ -147,7 +143,7 @@ Examples:
         required="--config" not in sys.argv,
         choices=[
             "fast_whisper", "whisper_cpp",
-            "sber_gigaam_ctc", "sber_gigaam_rnnt",
+            "transcribe_cpp",
             "hf_whisper",
         ],
         help="Transcriber backend to use",
@@ -236,12 +232,6 @@ Examples:
 
     # Additional options
     parser.add_argument(
-        "--use-onnx",
-        action="store_true",
-        help="Use ONNX runtime for Sber models (memory efficient)",
-    )
-
-    parser.add_argument(
         "--load-in-8bit",
         action="store_true",
         help="Enable 8-bit quantization for HF models",
@@ -268,8 +258,7 @@ Examples:
         defaults = {
             "fast_whisper": "medium",
             "whisper_cpp": "ggerganov/whisper.cpp",
-            "sber_gigaam_ctc": "ctc",
-            "sber_gigaam_rnnt": "rnnt",
+            "transcribe_cpp": "handy-computer/gigaam-v3-e2e-rnnt-gguf",
             "hf_whisper": "openai/whisper-medium",
         }
         args.model_id = defaults.get(args.model_type, "medium")
@@ -291,7 +280,6 @@ Examples:
         "beam_size": args.beam_size,
         "quantization": args.quantization,
         "n_threads": args.threads,
-        "use_onnx": args.use_onnx,
         "load_in_8bit": args.load_in_8bit,
     }
 

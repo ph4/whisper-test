@@ -23,6 +23,25 @@ benchmarks:
     devices: [cuda]
     load_in_8bit: false
     
+  # Transcribe.cpp with GGUF quantized GigaAM models (RECOMMENDED for memory-constrained systems)
+  - framework: transcribe.cpp
+    model: handy-computer/gigaam-v3-e2e-rnnt-gguf
+    quantizations: [Q5_K_M, Q6_K, Q8_0]
+    devices: [cpu]
+    threads: 4
+    
+  # Transcribe.cpp with GPU offloading (if CUDA available)
+  - framework: transcribe.cpp
+    model: handy-computer/gigaam-v3-e2e-ctc-gguf
+    quantizations: [Q5_K_M]
+    devices: [offload]
+    threads: 4
+    offload_configs:
+      - layer_count: 6
+        split_mode: layer
+      - layer_count: 12
+        split_mode: layer
+        
   # Full explicit configuration
   - framework: faster-whisper
     model: medium
@@ -31,3 +50,20 @@ benchmarks:
     beam_sizes: [1]
     compute_type: int8_float32
     language: ru
+
+# Test datasets with ground truth for WER/CER calculation
+test_datasets:
+  - name: "russian_speech_sample"
+    audio_path: "test_audio/sample_ru.wav"
+    reference_text: "Это тестовая фраза для проверки точности распознавания речи."
+    language: "ru"
+    
+  - name: "english_speech_sample"
+    audio_path: "test_audio/sample_en.wav"
+    reference_text: "This is a test phrase for speech recognition accuracy verification."
+    language: "en"
+    
+  - name: "multilingual_test"
+    audio_path: "test_audio/multi.wav"
+    reference_text: "path/to/ground_truth.txt"  # Can be file path or inline text
+    languages: ["ru", "en"]
