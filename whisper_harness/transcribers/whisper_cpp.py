@@ -24,6 +24,9 @@ class WhisperCppTranscriber(Transcriber):
     def __init__(
         self,
         model_id: str = "ggerganov/whisper.cpp",
+        model_prefix: str = "ggml",
+        model_size: str = "base",
+        model_lang: str = None,
         device: str = "cpu",
         quantization: str = "q5_0",
         n_threads: int = 2,
@@ -41,6 +44,9 @@ class WhisperCppTranscriber(Transcriber):
             **kwargs: Additional parameters.
         """
         super().__init__(model_id, device, **kwargs)
+        self.model_lang = model_lang
+        self.model_prefix = model_prefix
+        self.model_size = model_size
         self.quantization = quantization
         self.n_threads = n_threads
         self.use_gpu = use_gpu or (device == "cuda")
@@ -65,12 +71,10 @@ class WhisperCppTranscriber(Transcriber):
             quant_suffix = quant_map.get(self.quantization, self.quantization)
 
             # Determine model file based on model_id
-            if self.model_id == "ggerganov/whisper.cpp":
-                # Default whisper.cpp models
-                model_file = f"ggml-{quant_suffix}.bin"
+            if self.model_lang is not None:
+                model_file = f"{self.model_prefix}-{self.model_size}.{self.model_lang}-{quant_suffix}.bin"
             else:
-                # Custom models (e.g., Russian fine-tunes)
-                model_file = f"ggml-model-{quant_suffix}.bin"
+                model_file = f"{self.model_prefix}-{self.model_size}-{quant_suffix}.bin"
 
             model_path = hf_hub_download(
                 repo_id=self.model_id,

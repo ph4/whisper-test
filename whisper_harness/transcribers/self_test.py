@@ -300,8 +300,9 @@ class TranscriberSelfTest:
             
             transcriber = WhisperCppTranscriber(
                 model_id="ggerganov/whisper.cpp",
+                model_size="tiny",
                 device="cpu",
-                quantization="q5_0",
+                quantization="q5_1",
                 n_threads=2
             )
             
@@ -382,7 +383,7 @@ class TranscriberSelfTest:
             
             # Use a small GGUF model for testing
             transcriber = TranscribeCppTranscriber(
-                model_id="openai/whisper-tiny",  # This should resolve to a GGUF variant
+                model_id="handy-computer/whisper-tiny-gguf",  # This should resolve to a GGUF variant
                 device="cpu",
                 quantization="Q5_K_M",
                 n_threads=2
