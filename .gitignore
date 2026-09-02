@@ -1,14 +1,7 @@
 ```
-# Compiled and build artifacts
+# Compiled Python files
 *.pyc
 __pycache__/
-*.o
-*.obj
-dist/
-build/
-*.so
-*.dylib
-*.dll
 
 # Dependencies
 .venv/
@@ -17,23 +10,39 @@ venv/
 .env.local
 *.env.*
 
-# Logs and temp files
-*.log
-*.tmp
-*.swp
+# Build artifacts
+build/
+dist/
+*.so
+*.dylib
+*.dll
 
-# Editors
-.vscode/
-.idea/
+# Logs
+*.log
 
 # Coverage reports
 .coverage
-htmlcov/
 coverage/
+htmlcov/
 
-# Distribution / packaging
-*.egg-info/
-.Python
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
 .pytest_cache/
 .mypy_cache/
 ```
+
+*.mp3
+*.wav
+*.ogg
+whisper_harness/config.yml
+demo_results/
