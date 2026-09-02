@@ -44,9 +44,10 @@ def create_transcriber(
     from transcribers import (
         FasterWhisperTranscriber,
         WhisperCppTranscriber,
-        SberGigaAMTranscriber,
         HuggingFaceWhisperTranscriber,
+        TranscribeCppTranscriber,
     )
+    from transcribers.sber import SberGigaAMTranscriber
 
     transcriber_map = {
         "fast_whisper": FasterWhisperTranscriber,
