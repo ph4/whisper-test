@@ -1,6 +1,6 @@
 """Utils package for metrics and memory monitoring."""
 
-from utils.metrics import (
+from .metrics import (
     calculate_wer,
     calculate_cer,
     calculate_rtf,
@@ -9,7 +9,7 @@ from utils.metrics import (
     calculate_word_count,
     calculate_char_count,
 )
-from utils.memory_monitor import (
+from .memory_monitor import (
     MemoryMonitor,
     clear_gpu_cache,
     get_system_info,

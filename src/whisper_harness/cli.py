@@ -5,14 +5,19 @@ Supports multiple ASR backends: faster-whisper, whisper.cpp, transcribe.cpp (GGU
 Optimized for resource-constrained systems (GTX 1050 2GB, 4-8GB RAM).
 
 Usage:
-    python cli.py --audio test.wav --model-type fast_whisper --model-id medium --compute-type int8_float32
-    python cli.py --audio test.wav --model-type whisper_cpp --model-id ggerganov/whisper.cpp --quantization q5_0
-    python cli.py --audio test.wav --model-type transcribe_cpp --model-id handy-computer/gigaam-v3-e2e-rnnt-gguf --quantization Q5_K_M
+    python src/whisper_harness/cli.py --audio test.wav --model-type fast_whisper --model-id medium --compute-type int8_float32
+    whisper-cli --audio test.wav --model-type fast_whisper --model-id medium  # after pip install -e .
 """
 
 import argparse
 import json
 import os
+import sys
+from pathlib import Path
+
+# Allow running as script from repo root: python src/whisper_harness/cli.py
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).parent.parent))
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -41,13 +46,13 @@ def create_transcriber(
     **kwargs: Any,
 ):
     """Factory function to create transcriber instances."""
-    from transcribers import (
+    from .transcribers import (
         FasterWhisperTranscriber,
         WhisperCppTranscriber,
         HuggingFaceWhisperTranscriber,
         TranscribeCppTranscriber,
     )
-    from transcribers.sber import SberGigaAMTranscriber
+    from .transcribers.sber import SberGigaAMTranscriber
 
     transcriber_map = {
         "fast_whisper": FasterWhisperTranscriber,
@@ -94,7 +99,7 @@ def save_results(
 
     # Add WER/CER if reference provided
     if reference:
-        from utils.metrics import calculate_wer, calculate_cer
+        from .utils.metrics import calculate_wer, calculate_cer
 
         output_data["wer"] = calculate_wer(reference, result.get("text", ""))
         output_data["cer"] = calculate_cer(reference, result.get("text", ""))
@@ -315,7 +320,7 @@ Examples:
         result["audio_path"] = args.audio
 
         # Print formatted results
-        from utils.metrics import format_metrics
+        from .utils.metrics import format_metrics
 
         print(format_metrics(result, reference=reference_text))
 

@@ -296,7 +296,7 @@ class TranscriberSelfTest:
         results = []
         
         try:
-            from transcribers.whisper_cpp import WhisperCppTranscriber
+            from whisper_harness.transcribers.whisper_cpp import WhisperCppTranscriber
             
             # Determine devices to test
             devices_to_test = []
@@ -423,7 +423,7 @@ class TranscriberSelfTest:
         results = []
         
         try:
-            from transcribers.transcribe_cpp import TranscribeCppTranscriber
+            from whisper_harness.transcribers.transcribe_cpp import TranscribeCppTranscriber
             
             # Determine devices to test
             devices_to_test = []
@@ -563,7 +563,7 @@ class TranscriberSelfTest:
         start = time.perf_counter()
         
         try:
-            from transcribers.hf_whisper import HuggingFaceWhisperTranscriber
+            from whisper_harness.transcribers.hf_whisper import HuggingFaceWhisperTranscriber
             
             # Use a small model for testing
             transcriber = HuggingFaceWhisperTranscriber(
@@ -657,7 +657,7 @@ class TranscriberSelfTest:
         start = time.perf_counter()
         
         try:
-            from transcribers.sber import SberGigaAMTranscriber
+            from whisper_harness.transcribers.sber import SberGigaAMTranscriber
             
             # Use CTC model (smaller) with ONNX if available
             transcriber = SberGigaAMTranscriber(

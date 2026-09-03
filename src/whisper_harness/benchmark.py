@@ -21,10 +21,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+if __package__ is None or __name__ == "__main__":
+    # Running as standalone script (not imported as package) — add repo root to path
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.memory_monitor import MemoryMonitor, get_system_info
-from utils.metrics import calculate_wer, calculate_cer, calculate_rtf
+from whisper_harness.utils.memory_monitor import MemoryMonitor, get_system_info
+from whisper_harness.utils.metrics import calculate_wer, calculate_cer, calculate_rtf
 
 
 @dataclass

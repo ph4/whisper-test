@@ -2,8 +2,8 @@
 # ==============================================
 # 
 # IMPLEMENTATION STATUS: ✅ COMPLETE & TESTED
-# All features from this design have been implemented in benchmark.py
-# Tests available in test_harness.py (run with: python -m unittest test_harness.py -v)
+# All features from this design have been implemented in src/whisper_harness/benchmark.py
+# Tests available in tests/ (run with: pytest)
 
 ## Overview
 
@@ -285,7 +285,7 @@ python benchmark.py --generate-sample-config
 ### Run Tests
 
 ```bash
-python -m unittest test_harness.py -v
+pytest
 ```
 
 Tests cover:
@@ -324,4 +324,4 @@ See `sample_benchmark_config.yaml` for a complete working example that includes:
 
 - Check README.md for installation instructions
 - Review CUDA_CACHE_FREE.md for VRAM management options
-- Run tests to verify your setup: `python -m unittest test_harness.py -v`
+- Run tests to verify your setup: `pytest`

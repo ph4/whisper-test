@@ -1,135 +1,174 @@
-# Whisper Benchmark Harness
+# Whisper Harness
 
-Комплексный testing harness для сравнительного анализа производительности и точности моделей Whisper.
+Модульный харнесс для бенчмаркинга и тестирования ASR-моделей (Whisper, Sber GigaAM) на ресурсоограниченных системах.
+
+> **Перенесён в `src/whisper_harness/`.** Старая одномодульная версия — в `legacy/`.
+
+## 🎯 Целевое железо
+
+- **CPU**: AMD A4-5300 (2 ядра, 3.4 ГГц)
+- **RAM**: 4–8 ГБ DDR3
+- **GPU**: NVIDIA GTX 1050 2 ГБ
+- **Python**: 3.10+
 
 ## Возможности
 
-- **Поддержка фреймворков**: faster-whisper, whisper.cpp, transcribe.cpp (GGUF), HuggingFace transformers
+- **Фреймворки**: faster-whisper, whisper.cpp, transcribe.cpp (GGUF), HuggingFace transformers, Sber GigaAM (ONNX)
 - **Модели**: tiny, base, small, medium, large-v2, large-v3 + русскоязычные модели
-- **Квантизации**: float32, float16, int8, int8_float16, int8_float32, GGUF (Q4_0, Q5_K_M, Q8_0, etc.)
-- **Мониторинг памяти**: RAM и VRAM с интервалом 100мс
+- **Квантизации**: float32, float16, int8, int8_float16, int8_float32, GGUF (Q4_0, Q5_K_M, Q8_0 и др.)
+- **GPU offloading**: послойный offload для систем с ≤2 ГБ VRAM
+- **Мониторинг памяти**: RAM и VRAM с интервалом 100 мс
 - **Метрики**: RTF, WER, CER, время загрузки/транскрипции
-- **Режимы**: quick, full, compare, optimal
-- **Отчеты**: CSV, JSON, Markdown
-- **Self-Test**: Автоматическая проверка установки библиотек и загрузки моделей (CPU/GPU)
+- **Режимы**: quick, full, compare
+- **Отчёты**: CSV, JSON, Markdown
+- **Self-test**: автоматическая проверка установки библиотек и загрузки моделей (CPU/GPU)
 
 ## Установка
 
 ```bash
-# Установить зависимости
+# Создать venv и установить зависимости
+uv venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# Для whisper.cpp (опционально)
-git clone https://github.com/ggerganov/whisper.cpp
-cd whisper.cpp
-make
-# Для GPU поддержки:
-# make LLAMA_CUDA=1
+# Опционально: PyTorch для улучшенного управления VRAM
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+
+# Опционально: whisper.cpp
+pip install pywhispercpp
+
+# Опционально: ONNX Runtime для Sber GigaAM
+pip install onnxruntime-gpu
+```
+
+Или установить как пакет:
+
+```bash
+pip install -e .
+
+# После чего доступны команды:
+whisper-bench --help
+whisper-cli --help
+```
+
+## Структура проекта
+
+```
+whisper-test/
+├── src/whisper_harness/          # Основной код
+│   ├── cli.py                    # CLI для одиночного запуска
+│   ├── benchmark.py              # Бенчмарк харнесс
+│   ├── transcribers/             # Адаптеры фреймворков
+│   │   ├── base.py               # Базовый класс Transcriber
+│   │   ├── faster_whisper.py
+│   │   ├── whisper_cpp.py
+│   │   ├── hf_whisper.py
+│   │   ├── transcribe_cpp.py
+│   │   ├── sber.py
+│   │   └── self_test.py         # Диагностика установки
+│   └── utils/
+│       ├── metrics.py            # WER, CER, RTF
+│       └── memory_monitor.py     # RAM/VRAM мониторинг
+├── configs/                      # YAML-конфигурации
+│   └── sample_benchmark_config.yaml
+├── tests/                        # pytest тесты
+│   └── test_harness.py
+├── docs/
+│   └── YAML_DESIGN.md            # Полная спецификация YAML
+├── examples/                     # Демо-скрипты и примеры
+│   ├── demo_benchmark.py
+│   └── demo_results/
+└── legacy/                       # Старая одномодульная версия
 ```
 
 ## Быстрый старт
 
-### Базовое тестирование
+### CLI — одиночная транскрипция
 
 ```bash
-python whisper_benchmark.py --audio test_audio.wav --mode quick
+# Faster-Whisper (рекомендуется, оптимально для 2 ГБ VRAM)
+python -m whisper_harness.cli \
+    --audio test.wav \
+    --model-type fast_whisper \
+    --model-id medium \
+    --compute-type int8_float32 \
+    --language ru
+
+# Whisper.cpp с квантованной моделью
+python -m whisper_harness.cli \
+    --audio test.wav \
+    --model-type whisper_cpp \
+    --model-id ggerganov/whisper.cpp \
+    --quantization q5_0
+
+# Transcribe.cpp + GGUF GigaAM (рекомендуется для малой памяти)
+python -m whisper_harness.cli \
+    --audio test.wav \
+    --model-type transcribe_cpp \
+    --model-id handy-computer/gigaam-v3-e2e-rnnt-gguf \
+    --quantization Q5_K_M
 ```
 
-### Полное тестирование
+### Бенчмарк — массовое тестирование
 
 ```bash
-python whisper_benchmark.py \
-    --audio test_audio.wav \
-    --frameworks faster-whisper,whisper.cpp \
-    --models tiny,base,small,medium,large-v3 \
-    --quantizations int8,int8_float16,int8_float32 \
-    --beam-sizes 1,3,5 \
-    --output-dir results/ \
-    --mode full \
-    --language ru \
-    --monitor-memory-interval 100
-```
+# Быстрый бенчмарк
+python -m whisper_harness.benchmark --audio test.wav --mode quick
 
-### С ground truth для оценки точности
+# Полный бенчмарк с YAML
+python -m whisper_harness.benchmark \
+    --audio test.wav \
+    --config configs/sample_benchmark_config.yaml \
+    --mode full
 
-```bash
-python whisper_benchmark.py \
-    --audio test_audio.wav \
-    --ground-truth "Эталонная транскрипция на русском языке" \
-    --language ru \
+# С ground truth для WER/CER
+python -m whisper_harness.benchmark \
+    --audio test.wav \
+    --reference ground_truth.txt \
     --mode quick
 ```
 
-### Конвертация аудио в нужный формат
+### YAML-конфигурация
 
-```bash
-python whisper_benchmark.py \
-    --audio input.mp3 \
-    --convert-audio \
-    --mode quick
-```
-
-## Аргументы командной строки
-
-| Аргумент | Описание | По умолчанию |
-|----------|----------|--------------|
-| `--audio` | Путь к аудиофайлу | (обязательно) |
-| `--ground-truth` | Эталонная транскрипция для WER/CER | None |
-| `--frameworks` | Фреймворки через запятую (faster-whisper, whisper.cpp, transcribe.cpp, huggingface) | faster-whisper |
-| `--models` | Модели через запятую | tiny,base,small,medium,large-v2,large-v3 |
-| `--quantizations` | Квантизации через запятую | int8,int8_float16,int8_float32,float16,float32 |
-| `--beam-sizes` | Размеры луча через запятую | 1,3,5 |
-| `--output-dir` | Директория для результатов | benchmark_results |
-| `--mode` | Режим тестирования | full |
-| `--language` | Язык транскрипции | ru |
-| `--threads` | Количество CPU потоков | 2 |
-| `--gpu-id` | ID GPU для multi-GPU | 0 |
-| `--gpu-layers` | Количество слоёв для offloading на GPU (whisper.cpp, transcribe.cpp) | None (auto) |
-| `--whisper-cpp-path` | Путь к whisper.cpp | ./whisper.cpp |
-| `--monitor-memory-interval` | Интервал мониторинга (мс) | 100 |
-| `--warmup-runs` | Прогревочные запуски | 1 |
-| `--convert-audio` | Конвертировать аудио в WAV | False |
+См. `configs/sample_benchmark_config.yaml` и `docs/YAML_DESIGN.md`.
 
 ## 🔧 Self-Test / Диагностика
 
-**Проверка установки и работоспособности всех фреймворков:**
+Проверка установки всех библиотек и возможности загрузки моделей.
 
 ```bash
-# Перейти в директорию whisper_harness
-cd whisper_harness
+# Полное тестирование всех фреймворков (CPU + GPU)
+python -m whisper_harness.transcribers.self_test
 
-# Быстрая проверка импортов библиотек
-python -m transcribers.self_test --quick
+# Быстрая проверка (только импорты, без загрузки моделей)
+python -m whisper_harness.transcribers.self_test --quick
 
-# Полное тестирование с загрузкой минимальных моделей (tiny) на CPU и GPU
-python -m transcribers.self_test
+# Тестирование конкретного фреймворка
+python -m whisper_harness.transcribers.self_test --framework faster-whisper
+python -m whisper_harness.transcribers.self_test --framework whisper.cpp
+python -m whisper_harness.transcribers.self_test --framework transcribe.cpp
+python -m whisper_harness.transcribers.self_test --framework huggingface
 
-# Тест конкретного фреймворка
-python -m transcribers.self_test --framework faster-whisper
-python -m transcribers.self_test --framework whisper.cpp
-python -m transcribers.self_test --framework transcribe.cpp
-python -m transcribers.self_test --framework huggingface
-
-# Только GPU или только CPU тесты
-python -m transcribers.self_test --gpu-only
-python -m transcribers.self_test --cpu-only
+# Только GPU или только CPU
+python -m whisper_harness.transcribers.self_test --gpu-only
+python -m whisper_harness.transcribers.self_test --cpu-only
 
 # Экспорт результатов в JSON
-python -m transcribers.self_test --output selftest_results.json
+python -m whisper_harness.transcribers.self_test --output selftest_results.json
 ```
 
 **Что проверяется:**
-1. ✅ Наличие установленных библиотек (faster_whisper, pywhispercpp, transformers, onnxruntime, etc.)
+1. ✅ Наличие установленных библиотек (faster_whisper, pywhispercpp, transformers, onnxruntime и т.д.)
 2. ✅ Возможность загрузки минимальной модели (tiny) для каждого фреймворка
 3. ✅ Работа на CPU и GPU (если доступно)
 4. ✅ Поддержка GPU offloading (полный и частичный через `--gpu-layers`)
-5. ✅ Базовая транскрипция тестового аудио (1 секунда тишины)
+5. ✅ Базовая транскрипция тестового аудио
 
 **Интерпретация результатов:**
-- ✅ **PASSED** - Библиотека установлена и модель загружается успешно
-- ❌ **FAILED** - Ошибка: требуется установка библиотеки или исправление конфигурации
-- ⚠️ **SKIPPED** - Пропущено (например, CUDA недоступен или quick mode)
-- ⚡ **WARNING** - Работает, но есть ограничения (например, нет GPU или используется fallback)
+- ✅ **PASSED** — библиотека установлена и модель загружается успешно
+- ❌ **FAILED** — ошибка: требуется установка или исправление конфигурации
+- ⚠️ **SKIPPED** — пропущено (CUDA недоступен, quick mode и т.д.)
+- ⚡ **WARNING** — работает, но есть ограничения (нет GPU, используется fallback)
 
 **GPU Offloading:**
 - whisper.cpp и transcribe.cpp поддерживают partial/full offloading через параметр `gpu_layers`
@@ -137,113 +176,33 @@ python -m transcribers.self_test --output selftest_results.json
 - `gpu_layers=N` → частичный offloading (N слоёв на GPU, остальные на CPU)
 - Self-test автоматически проверяет оба режима при наличии GPU
 
-## Режимы работы
+## Запуск тестов
 
-### quick
-Быстрое тестирование основных конфигураций (small, medium). Пропускает заведомо неподходящие модели для 2GB VRAM.
-
-### full
-Полное тестирование всех комбинаций моделей, квантизаций и beam sizes. Может занять несколько часов.
-
-### compare
-Сравнение фреймворков faster-whisper vs whisper.cpp на одинаковых моделях.
-
-### optimal
-Автоматический поиск оптимальной конфигурации по балансу скорость/память.
-
-## Выходные файлы
-
-### CSV (`results_YYYYMMDD_HHMMSS.csv`)
-Детальные метрики для каждой конфигурации:
-- framework, model, quantization, device, beam_size
-- load_time_sec, transcribe_time_sec, rtf, total_time_sec
-- ram_before_mb, ram_after_mb, ram_peak_mb
-- vram_before_mb, vram_after_mb, vram_peak_mb
-- wer, cer, word_count, char_count
-- status, error_message
-
-### JSON (`results_YYYYMMDD_HHMMSS.json`)
-Полная информация включая:
-- Конфигурация системы (CPU, RAM, GPU, CUDA version)
-- Версии библиотек
-- Timestamp начала/окончания
-- Все метрики из CSV
-
-### Markdown отчет (`report_YYYYMMDD_HHMMSS.md`)
-- Сводная таблица с лучшими результатами
-- Топ-5 по производительности (RTF)
-- Топ-5 по эффективности памяти (VRAM)
-- Топ-5 по точности (WER)
-- Детальные результаты по фреймворкам
-- Рекомендации по оптимальным конфигурациям
-
-## Пример отчета
-
-```markdown
-## 🏆 Best Performance (Lowest RTF)
-
-| Rank | Framework | Model | Quantization | Device | Beam | RTF | Time (s) | VRAM (MB) |
-|------|-----------|-------|--------------|--------|------|-----|----------|-----------|
-| 1 | faster-whisper | small | int8_float32 | cuda | 1 | 0.125 | 37.5 | 650 |
-| 2 | faster-whisper | medium | int8_float32 | cuda | 1 | 0.245 | 73.5 | 820 |
-...
-
-## 💡 Recommendations
-
-### Best GPU Performance (< 2GB VRAM)
-- **Model**: small
-- **Framework**: faster-whisper
-- **Quantization**: int8_float32
-- **RTF**: 0.125
-- **VRAM**: 650 MB
+```bash
+pytest
 ```
 
-## Русскоязычные модели
+## Рекомендации для GTX 1050 2 ГБ
 
-Harness автоматически проверяет поддержку русского языка. Рекомендуемые модели:
+| Модель   | Квантизация  | VRAM   | RTF  | Рекомендация |
+|----------|--------------|--------|------|--------------|
+| tiny     | int8_float32 | ~200 МБ | 0.1x | ✅ Отлично для быстрых задач |
+| base     | int8_float32 | ~350 МБ | 0.15x | ✅ Хороший баланс |
+| small    | int8_float32 | ~500 МБ | 0.3x | ✅ Рекомендуется для продакшена |
+| medium   | int8_float32 | ~850 МБ | 0.5x | ✅ Работает, но медленно |
+| large-v3 | int8_float32 | ~2.5 ГБ | ❌ OOM | ❌ Не рекомендуется |
 
-### Стандартные Whisper
-- `large-v3` - лучшая поддержка русского
-- `large-v2` - отличная поддержка
-- `medium`, `small`, `base`, `tiny` - хорошая поддержка
+**Оптимальная конфигурация для продакшена:**
 
-### Специализированные (HuggingFace)
-- `bond005/whisper_large_v2_ru` - fine-tuned для русского
-- Другие модели с суффиксом `_ru` или `russian`
-
-## Мониторинг памяти
-
-Harness измеряет:
-- **RAM**: через psutil (или /proc/self/status на Linux)
-- **VRAM**: через pynvml (или nvidia-smi fallback)
-- **Частота**: каждые 100мс во время транскрипции
-- **Метрики**: до загрузки, после загрузки, пиковое потребление
-
-## Обработка ошибок
-
-- **OOM (Out of Memory)**: graceful handling, пропуск конфигурации
-- **Таймауты**: 10 минут на транскрипцию
-- **Логирование**: все ошибки детально логируются
-- **Продолжение**: тестирование продолжается после ошибок
-
-## Воспроизводимость
-
-- Фиксированный random seed
-- Очистка GPU памяти между тестами (`torch.cuda.empty_cache()`)
-- Warm-up run перед измерением
-- Перезапуск процесса для каждого теста (опционально)
-
-## Системные требования
-
-### Минимальные
-- CPU: 2 ядра
-- RAM: 4 GB
-- GPU: NVIDIA с 2GB VRAM (опционально)
-
-### Рекомендуемые
-- CPU: 4+ ядра
-- RAM: 8+ GB
-- GPU: NVIDIA GTX 1050 Ti или лучше с 4GB+ VRAM
+```bash
+python -m whisper_harness.cli \
+    --audio test.wav \
+    --model-type fast_whisper \
+    --model-id small \
+    --compute-type int8_float32 \
+    --beam-size 1 \
+    --language ru
+```
 
 ## Лицензия
 

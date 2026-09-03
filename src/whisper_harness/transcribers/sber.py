@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any
 
-from transcribers.base import Transcriber
+from .base import Transcriber
 
 
 class SberGigaAMTranscriber(Transcriber):
